@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>길드 관리</title>
+<style>
+  :root{
+    --bg:#e7e4dc; --surface:#f7f5f0; --surface2:#efece4; --ink:#232019; --ink2:#504b42;
+    --sub:#948e82; --line:#d6d0c4; --line2:#e4dfd4; --accent:#9c7a57; --accent-dark:#7f6041;
+    --accent-soft:#ebe3d8; --baemin:#5a7d77; --coupang:#a26a7c; --promo:#a4863f; --good:#2f785a; --amount:#2a2620;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Segoe UI",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
+    max-width:760px;margin:0 auto;padding:14px 12px 84px;overflow-x:hidden;}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.5px;margin:4px 2px 2px;}
+  .eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--accent);font-weight:700;text-transform:uppercase;margin:0 2px 14px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:12px;}
+  .lbl{display:block;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+  input,select,button,textarea{font-family:inherit;}
+  .fld{width:100%;padding:11px 12px;background:#fff;border:1px solid var(--line2);border-radius:6px;color:var(--ink);font-size:15px;outline:none;}
+  .fld:focus{border-color:var(--accent);}
+  select.fld{appearance:none;background:#fff;}
+  .row{display:flex;gap:8px;align-items:center;}
+  .btn{padding:10px 14px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;}
+  .btn:active{background:var(--surface2);}
+  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn.accent{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.sm{padding:7px 10px;font-size:12px;}
+  .muted{color:var(--sub);font-size:12.5px;}
+
+  /* 주차/단가 바 */
+  .topbar{display:flex;gap:8px;margin-bottom:12px;}
+  .topbar select{flex:1;}
+  .modeseg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .modeseg button{padding:9px 10px;border:none;background:#fff;color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;}
+  .modeseg button.on{background:var(--ink);color:#fff;}
+  .rateline{display:flex;align-items:baseline;gap:8px;border-bottom:2px solid var(--ink);padding-bottom:6px;}
+  .rateline .unit{font-size:13px;color:var(--sub);font-weight:600;}
+  .rateline input{flex:1;min-width:0;border:none;background:transparent;text-align:right;font-size:24px;font-weight:800;outline:none;color:var(--ink);}
+
+  /* 멤버 입력 카드 */
+  .prow{position:relative;background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px;margin-bottom:9px;}
+  .prow .nm{font-size:15px;font-weight:700;margin-bottom:9px;}
+  .prow .ins{display:flex;gap:8px;}
+  .prow .ins label{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .prow .ins label>span{font-size:10px;font-weight:700;text-align:center;}
+  .sp-b{color:var(--baemin);}.sp-c{color:var(--coupang);}.sp-p{color:var(--promo);}
+  .prow .ins input{width:100%;min-width:0;padding:10px 4px;border:1px solid var(--line2);border-radius:6px;font-size:16px;text-align:center;background:#fbfaf6;outline:none;}
+  .prow .ins input:focus{border-color:var(--accent);background:#fff;}
+  .prow .res{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:9px;border-top:1px dashed var(--line2);font-size:13px;}
+  .prow .res .cc{color:var(--sub);} .prow .res .cc b{color:var(--ink2);}
+  .prow .res .pp b{color:var(--amount);font-weight:800;font-size:16px;}
+
+  /* 요약 */
+  .summary{background:var(--ink);border-color:var(--ink);color:#e8e4db;}
+  .summary .sr{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+  .summary .sr:last-child{border-bottom:none;}
+  .summary .k{color:#a39d92;font-size:13px;} .summary .v{font-weight:700;font-size:17px;}
+  .summary .tot{margin-top:6px;padding-top:13px;border-top:1px solid rgba(255,255,255,.22);}
+  .summary .tot .k{color:#fff;font-weight:700;} .summary .tot .v{color:#e7c79c;font-size:22px;font-weight:800;}
+
+  /* 명단 */
+  .mitem{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line2);}
+  .mitem input{flex:1;border:none;background:transparent;font-size:15px;font-weight:600;outline:none;color:var(--ink);}
+  .mitem.off input{color:var(--sub);text-decoration:line-through;}
+  .pill{font-size:10px;font-weight:700;padding:3px 7px;border-radius:20px;border:1px solid var(--line);color:var(--sub);background:#fff;cursor:pointer;}
+  .pill.on{background:var(--good);color:#fff;border-color:var(--good);}
+  .mitem .del{color:#c08;background:none;border:none;font-size:18px;cursor:pointer;padding:2px 6px;}
+
+  /* 히스토리 */
+  .htbl{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .htbl th{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;text-align:right;padding:6px 6px;border-bottom:1px solid var(--ink);}
+  .htbl th:first-child{text-align:left;}
+  .htbl td{text-align:right;padding:9px 6px;border-bottom:1px solid var(--line2);}
+  .htbl td:first-child{text-align:left;font-weight:600;}
+  .htbl td .pay{color:var(--good);font-weight:700;}
+  .wkitem{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:#fff;cursor:pointer;}
+  .wkitem .t{font-weight:700;} .wkitem .s{font-size:12px;color:var(--sub);}
+
+  /* 공지/내보내기 */
+  textarea.notice{width:100%;min-height:200px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:12px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.6;outline:none;resize:vertical;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .grid2 .btn{display:flex;align-items:center;justify-content:center;gap:6px;}
+
+  /* nav */
+  .nav{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);display:flex;max-width:760px;margin:0 auto;}
+  .nav button{flex:1;border:none;background:none;padding:10px 4px 12px;font-size:11px;font-weight:700;color:var(--sub);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .nav button .ic{font-size:19px;}
+  .nav button.on{color:var(--accent-dark);}
+  .nav button.on .ic{transform:translateY(-1px);}
+  .hidden{display:none;}
+  .addbar{display:flex;gap:8px;margin-top:12px;}
+  .modal{position:fixed;inset:0;background:rgba(35,32,25,.6);display:none;align-items:center;justify-content:center;padding:18px;z-index:50;}
+  .modal.open{display:flex;}
+  .modal-box{background:var(--surface);border-radius:8px;padding:16px;max-width:560px;width:100%;max-height:90vh;overflow:auto;}
+  .modal-box img{width:100%;border-radius:4px;border:1px solid var(--line);}
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+  <div class="eyebrow" id="eyebrow">DELIVERY GUILD · MANAGER</div>
+
+  <!-- ============ 이번주 입력 ============ -->
+  <section id="sec-input">
+    <h1>이번주 입력</h1>
+    <div class="topbar">
+      <select class="fld" id="weekSel"></select>
+      <button class="btn" id="newWeekBtn">+ 새 주차</button>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+        <span class="lbl" style="margin:0;">정산 단가 방식</span>
+        <div class="modeseg" id="modeSeg">
+          <button data-mode="rate">콜당단가</button>
+          <button data-mode="total">총길드비</button>
+        </div>
+      </div>
+      <div id="rateWrap" class="rateline"><span class="unit">콜당</span><input id="rateInp" inputmode="numeric" placeholder="80"><span class="unit">원</span></div>
+      <div id="totalWrap" class="rateline hidden"><span class="unit">총길드비 ₩</span><input id="totalInp" inputmode="numeric" placeholder="400,000"></div>
+      <div class="muted" id="rateHint" style="margin-top:8px;"></div>
+    </div>
+    <div id="memInputs"></div>
+    <div class="card summary" id="inputSummary"></div>
+  </section>
+
+  <!-- ============ 명단 ============ -->
+  <section id="sec-members" class="hidden">
+    <h1>길드원 명단</h1>
+    <div class="card">
+      <div id="memberList"></div>
+      <div class="addbar">
+        <input class="fld" id="newMemName" placeholder="새 길드원 이름">
+        <button class="btn accent" id="addMemBtn">추가</button>
+      </div>
+      <div class="muted" style="margin-top:10px;">탈퇴(비활성)는 과거 기록을 보존합니다. 삭제는 데이터가 없을 때만 권장.</div>
+    </div>
+    <div class="card">
+      <span class="lbl">설정</span>
+      <div class="row" style="justify-content:space-between;">
+        <span>쿠팡 가중치 (1콜당)</span>
+        <input class="fld" id="weightInp" inputmode="decimal" style="width:90px;text-align:right;">
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 히스토리 ============ -->
+  <section id="sec-history" class="hidden">
+    <h1>히스토리</h1>
+    <div class="topbar">
+      <select class="fld" id="histMode">
+        <option value="week">주차별 보기</option>
+        <option value="member">개인별 보기</option>
+      </select>
+      <select class="fld" id="histMember" style="display:none;"></select>
+    </div>
+    <div id="histBody"></div>
+  </section>
+
+  <!-- ============ 공지/내보내기 ============ -->
+  <section id="sec-export" class="hidden">
+    <h1>공지 · 내보내기</h1>
+    <div class="topbar"><select class="fld" id="expWeekSel"></select></div>
+    <div class="card">
+      <span class="lbl">단톡방 공지 (붙여넣기용)</span>
+      <textarea class="notice" id="noticeText" readonly></textarea>
+      <div class="grid2" style="margin-top:10px;">
+        <button class="btn primary" id="copyNoticeBtn">📋 공지 복사</button>
+        <button class="btn accent" id="imgBtn">🖼️ 정산표 이미지</button>
+      </div>
+    </div>
+    <div class="card">
+      <span class="lbl">데이터 내보내기 / 백업</span>
+      <div class="grid2">
+        <button class="btn" id="csvWeekBtn">이번주 CSV</button>
+        <button class="btn" id="csvAllBtn">전체 CSV</button>
+        <button class="btn" id="backupBtn">백업 저장(JSON)</button>
+        <button class="btn" id="importBtn">가져오기(JSON)</button>
+      </div>
+      <div class="muted" style="margin-top:10px;">스샷 처리 결과(JSON)를 받으면 [가져오기]에 붙여넣어 그 주를 입력할 수 있어요.</div>
+    </div>
+  </section>
+
+  <!-- nav -->
+  <div class="nav">
+    <button data-sec="input" class="on"><span class="ic">✏️</span>입력</button>
+    <button data-sec="members"><span class="ic">👥</span>명단</button>
+    <button data-sec="history"><span class="ic">📈</span>히스토리</button>
+    <button data-sec="export"><span class="ic">📤</span>공지</button>
+  </div>
+
+  <!-- 이미지 미리보기 -->
+  <div class="modal" id="imgModal"><div class="modal-box">
+    <img id="modalImg" alt="정산표">
+    <div class="grid2" style="margin-top:12px;">
+      <button class="btn accent" id="imgSaveBtn">저장 / 공유</button>
+      <button class="btn" id="imgCloseBtn">닫기</button>
+    </div>
+  </div></div>
+
+  <!-- 가져오기 -->
+  <div class="modal" id="impModal"><div class="modal-box">
+    <span class="lbl">JSON 가져오기 / 붙여넣기</span>
+    <textarea class="notice" id="impText" placeholder='여기에 백업 JSON 또는 스샷 처리 결과를 붙여넣으세요'></textarea>
+    <div class="grid2" style="margin-top:10px;">
+      <button class="btn accent" id="impApplyBtn">적용</button>
+      <button class="btn" id="impCloseBtn">닫기</button>
+    </div>
+  </div></div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+/* ===== 저장소 ===== */
+const KEY='guildSystem_v1';
+let S = load();
+function load(){
+  try{ const d=JSON.parse(localStorage.getItem(KEY)); if(d&&d.members) return d; }catch(e){}
+  return { settings:{coupangWeight:0.8}, members:[], weeks:[], currentWeekId:null };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function uid(){ return 'id'+Math.random().toString(36).slice(2,9); }
+function num(v){ const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function won(n){ return Math.round(n).toLocaleString('ko-KR')+' 원'; }
+function wonN(n){ return Math.round(n).toLocaleString('ko-KR'); }
+function cnt(n){ return Number(n.toFixed(1)).toLocaleString('ko-KR'); }
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1600); }
+
+/* ===== 초기 데이터 보정 ===== */
+if(!S.weeks.length){ const w=newWeek(); S.currentWeekId=w.id; }
+if(S.currentWeekId==null) S.currentWeekId=S.weeks[S.weeks.length-1].id;
+
+function newWeek(){ const w={ id:uid(), label:todayStr(), mode:'rate', callRate:'', totalFee:'', entries:{} }; S.weeks.push(w); return w; }
+function curWeek(){ return S.weeks.find(w=>w.id===S.currentWeekId) || S.weeks[S.weeks.length-1]; }
+function activeMembers(){ return S.members.filter(m=>m.active); }
+function membersForWeek(w){
+  const ids=new Set(S.members.filter(m=>m.active).map(m=>m.id));
+  Object.keys(w.entries||{}).forEach(id=>ids.add(id));
+  return S.members.filter(m=>ids.has(m.id));
+}
+function weekCalc(w){
+  const wt=S.settings.coupangWeight;
+  const rows=membersForWeek(w).map(m=>{
+    const e=w.entries[m.id]||{}; const baemin=num(e.baemin),coupang=num(e.coupang),event=num(e.event);
+    return {m,baemin,coupang,event,eventNote:e.eventNote||'',calls:baemin+coupang*wt};
+  });
+  const totalCalls=rows.reduce((s,r)=>s+r.calls,0);
+  const rate = w.mode==='total' ? (totalCalls>0?num(w.totalFee)/totalCalls:0) : num(w.callRate);
+  let guildSum=0,eventSum=0;
+  rows.forEach(r=>{ r.pay=r.calls*rate; r.final=r.pay+r.event; guildSum+=r.pay; eventSum+=r.event; });
+  return { rows, totalCalls, rate, guildSum, eventSum, paidSum:guildSum+eventSum };
+}
+
+/* ===== 네비게이션 ===== */
+const secs={input:'sec-input',members:'sec-members',history:'sec-history',export:'sec-export'};
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  Object.values(secs).forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById(secs[b.dataset.sec]).classList.remove('hidden');
+  if(b.dataset.sec==='input') renderInput();
+  if(b.dataset.sec==='members') renderMembers();
+  if(b.dataset.sec==='history') renderHistory();
+  if(b.dataset.sec==='export') renderExport();
+}));
+
+/* ===== 입력 화면 ===== */
+function weekOptions(sel){
+  return S.weeks.map(w=>`<option value="${w.id}" ${w.id===sel?'selected':''}>${w.label}</option>`).join('');
+}
+function renderInput(){
+  const w=curWeek();
+  document.getElementById('weekSel').innerHTML=weekOptions(w.id);
+  // 모드
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===w.mode));
+  document.getElementById('rateWrap').classList.toggle('hidden',w.mode!=='rate');
+  document.getElementById('totalWrap').classList.toggle('hidden',w.mode!=='total');
+  document.getElementById('rateInp').value=w.callRate||'';
+  document.getElementById('totalInp').value=w.totalFee||'';
+  // 멤버 입력
+  const mem=membersForWeek(w);
+  const box=document.getElementById('memInputs');
+  if(!mem.length){ box.innerHTML='<div class="card muted">명단 탭에서 길드원을 먼저 추가하세요.</div>'; }
+  else box.innerHTML=mem.map(m=>{
+    const e=w.entries[m.id]||{};
+    return `<div class="prow" data-mid="${m.id}">
+      <div class="nm">${esc(m.name)}${m.active?'':' <span class="muted">(탈퇴)</span>'}</div>
+      <div class="ins">
+        <label><span class="sp-b">배민 ×1</span><input class="i-b" inputmode="numeric" placeholder="0" value="${e.baemin??''}"></label>
+        <label><span class="sp-c">쿠팡 ×${S.settings.coupangWeight}</span><input class="i-c" inputmode="numeric" placeholder="0" value="${e.coupang??''}"></label>
+        <label><span class="sp-p">이벤트 원</span><input class="i-e" inputmode="numeric" placeholder="0" value="${e.event??''}"></label>
+      </div>
+      <div class="res"><span class="cc">합산 <b class="r-c">0</b> 콜</span><span class="pp"><b class="r-p">0 원</b></span></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.prow').forEach(p=>{
+    const mid=p.dataset.mid;
+    p.querySelectorAll('input').forEach(i=>i.addEventListener('input',()=>{
+      const e=w.entries[mid]||(w.entries[mid]={});
+      e.baemin=p.querySelector('.i-b').value; e.coupang=p.querySelector('.i-c').value; e.event=p.querySelector('.i-e').value;
+      save(); refreshInputCalc();
+    }));
+  });
+  refreshInputCalc();
+}
+function refreshInputCalc(){
+  const w=curWeek(); const c=weekCalc(w);
+  document.querySelectorAll('#memInputs .prow').forEach(p=>{
+    const r=c.rows.find(x=>x.m.id===p.dataset.mid); if(!r)return;
+    p.querySelector('.r-c').textContent=cnt(r.calls);
+    p.querySelector('.r-p').textContent=won(r.final);
+  });
+  document.getElementById('inputSummary').innerHTML=
+    `<div class="sr"><span class="k">전체 합산콜</span><span class="v">${cnt(c.totalCalls)}</span></div>
+     <div class="sr"><span class="k">콜당 단가</span><span class="v" style="color:#d4ad84">${wonN(c.rate)} 원</span></div>
+     <div class="sr"><span class="k">길드비 분배</span><span class="v">${won(c.guildSum)}</span></div>
+     <div class="sr"><span class="k">이벤트 합계</span><span class="v" style="color:#cbb27a">${won(c.eventSum)}</span></div>
+     <div class="sr tot"><span class="k">총 지급액</span><span class="v">${won(c.paidSum)}</span></div>`;
+  const hint=document.getElementById('rateHint');
+  hint.textContent = w.mode==='total' ? `콜당 단가 = 총길드비 ÷ ${cnt(c.totalCalls)}콜 = ${wonN(c.rate)}원 (자동)` : '합산콜 = 배민 + 쿠팡×'+S.settings.coupangWeight+' / 지급액 = 합산콜 × 콜당단가';
+}
+document.getElementById('weekSel').addEventListener('change',e=>{ S.currentWeekId=e.target.value; save(); renderInput(); });
+document.getElementById('newWeekBtn').addEventListener('click',()=>{
+  const label=prompt('새 주차 이름 (예: 6/26 또는 날짜)', todayStr());
+  if(label===null)return; const w=newWeek(); w.label=label.trim()||todayStr(); S.currentWeekId=w.id; save(); renderInput(); toast('새 주차 추가');
+});
+document.querySelectorAll('#modeSeg button').forEach(b=>b.addEventListener('click',()=>{ curWeek().mode=b.dataset.mode; save(); renderInput(); }));
+document.getElementById('rateInp').addEventListener('input',e=>{ curWeek().callRate=e.target.value; save(); refreshInputCalc(); });
+document.getElementById('totalInp').addEventListener('input',e=>{ curWeek().totalFee=e.target.value; save(); refreshInputCalc(); });
+
+/* ===== 명단 ===== */
+function renderMembers(){
+  const box=document.getElementById('memberList');
+  box.innerHTML = S.members.length ? S.members.map(m=>`
+    <div class="mitem ${m.active?'':'off'}" data-id="${m.id}">
+      <input class="m-name" value="${esc(m.name)}">
+      <span class="pill ${m.active?'on':''}">${m.active?'활동':'탈퇴'}</span>
+      <button class="del">×</button>
+    </div>`).join('') : '<div class="muted">아직 길드원이 없습니다. 아래에서 추가하세요.</div>';
+  box.querySelectorAll('.mitem').forEach(it=>{
+    const id=it.dataset.id; const m=S.members.find(x=>x.id===id);
+    it.querySelector('.m-name').addEventListener('input',e=>{ m.name=e.target.value; save(); });
+    it.querySelector('.pill').addEventListener('click',()=>{ m.active=!m.active; save(); renderMembers(); });
+    it.querySelector('.del').addEventListener('click',()=>{
+      const hasData=S.weeks.some(w=>w.entries[id]);
+      if(hasData && !confirm(`${m.name}님은 과거 기록이 있습니다.\n[확인] 완전 삭제(기록도 삭제) / [취소] 유지`)) return;
+      if(!hasData && !confirm(`${m.name}님을 삭제할까요?`)) return;
+      S.members=S.members.filter(x=>x.id!==id); S.weeks.forEach(w=>delete w.entries[id]); save(); renderMembers();
+    });
+  });
+  document.getElementById('weightInp').value=S.settings.coupangWeight;
+}
+document.getElementById('addMemBtn').addEventListener('click',addMem);
+document.getElementById('newMemName').addEventListener('keydown',e=>{ if(e.key==='Enter') addMem(); });
+function addMem(){
+  const inp=document.getElementById('newMemName'); const name=inp.value.trim(); if(!name)return;
+  S.members.push({id:uid(),name,active:true}); inp.value=''; save(); renderMembers(); toast('추가됨');
+}
+document.getElementById('weightInp').addEventListener('input',e=>{ const v=num(e.target.value)||0.8; S.settings.coupangWeight=v; save(); });
+
+/* ===== 히스토리 ===== */
+document.getElementById('histMode').addEventListener('change',renderHistory);
+document.getElementById('histMember').addEventListener('change',renderHistory);
+function renderHistory(){
+  const mode=document.getElementById('histMode').value;
+  const memSel=document.getElementById('histMember');
+  memSel.style.display = mode==='member'?'block':'none';
+  if(mode==='member' && !memSel.innerHTML){ memSel.innerHTML=S.members.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join(''); }
+  const body=document.getElementById('histBody');
+  if(mode==='week'){
+    body.innerHTML=[...S.weeks].reverse().map(w=>{ const c=weekCalc(w);
+      return `<div class="wkitem" data-id="${w.id}"><div><div class="t">${esc(w.label)}</div><div class="s">${cnt(c.totalCalls)}콜 · 콜당 ${wonN(c.rate)}원</div></div><div style="text-align:right"><div class="t" style="color:var(--good)">${won(c.paidSum)}</div><div class="s">${membersForWeek(w).length}명</div></div></div>`;
+    }).join('') || '<div class="muted">주차 기록이 없습니다.</div>';
+    body.querySelectorAll('.wkitem').forEach(it=>it.addEventListener('click',()=>showWeekDetail(it.dataset.id)));
+  } else {
+    const mid=memSel.value||(S.members[0]&&S.members[0].id); if(!mid){ body.innerHTML='<div class="muted">길드원이 없습니다.</div>'; return; }
+    let rows='',cum=0;
+    S.weeks.forEach(w=>{ const c=weekCalc(w); const r=c.rows.find(x=>x.m.id===mid); if(!r)return; if(!(r.baemin||r.coupang||r.event))return; cum+=r.final;
+      rows+=`<tr><td>${esc(w.label)}</td><td>${r.baemin}/${r.coupang}</td><td>${cnt(r.calls)}</td><td class="pay">${wonN(r.final)}</td><td>${wonN(cum)}</td></tr>`; });
+    body.innerHTML=`<div class="card"><table class="htbl"><tr><th>주차</th><th>배/쿠</th><th>합산</th><th>지급</th><th>누적</th></tr>${rows||'<tr><td colspan=5 class="muted">기록 없음</td></tr>'}</table></div>`;
+  }
+}
+function showWeekDetail(id){
+  const w=S.weeks.find(x=>x.id===id); const c=weekCalc(w);
+  let rows=c.rows.map(r=>`<tr><td>${esc(r.m.name)}</td><td>${r.baemin}/${r.coupang}</td><td>${cnt(r.calls)}</td><td class="pay">${wonN(r.final)}</td></tr>`).join('');
+  document.getElementById('histBody').innerHTML=
+    `<button class="btn sm" id="backWk">← 목록</button>
+     <div class="card" style="margin-top:10px"><div class="t" style="font-weight:800;font-size:18px">${esc(w.label)}</div>
+     <div class="muted" style="margin-bottom:8px">콜당 ${wonN(c.rate)}원 · 합산 ${cnt(c.totalCalls)}콜 · 총 ${won(c.paidSum)}</div>
+     <table class="htbl"><tr><th>이름</th><th>배/쿠</th><th>합산</th><th>지급</th></tr>${rows}</table></div>`;
+  document.getElementById('backWk').addEventListener('click',renderHistory);
+}
+
+/* ===== 공지 / 내보내기 ===== */
+function renderExport(){
+  const sel=document.getElementById('expWeekSel'); sel.innerHTML=weekOptions(curWeek().id);
+  sel.onchange=()=>{ S.currentWeekId=sel.value; save(); renderExport(); };
+  document.getElementById('noticeText').value=buildNotice(curWeek());
+}
+function buildNotice(w){
+  const c=weekCalc(w);
+  let L=[`📋 길드비 정산 (${w.label})`, `콜당 ${wonN(c.rate)}원 · 전체 ${cnt(c.totalCalls)}콜`, `━━━━━━━━`];
+  c.rows.forEach(r=>{ if(!(r.baemin||r.coupang||r.event))return;
+    let s=`${r.m.name} ─ 배민${r.baemin}+쿠팡${r.coupang}(×${S.settings.coupangWeight})=${cnt(r.calls)}콜 → ${wonN(r.pay)}원`;
+    if(r.event>0) s+=` +이벤트${wonN(r.event)}=${wonN(r.final)}원`;
+    L.push(s);
+  });
+  L.push(`━━━━━━━━`,`이벤트 합계 ${wonN(c.eventSum)}원`,`총 지급액 ${wonN(c.paidSum)}원`);
+  return L.join('\n');
+}
+document.getElementById('copyNoticeBtn').addEventListener('click',()=>{
+  const t=document.getElementById('noticeText').value;
+  navigator.clipboard.writeText(t).then(()=>toast('공지 복사됨'),()=>{ document.getElementById('noticeText').removeAttribute('readonly'); document.getElementById('noticeText').select(); document.execCommand('copy'); toast('복사됨'); });
+});
+document.getElementById('csvWeekBtn').addEventListener('click',()=>exportCSV(false));
+document.getElementById('csvAllBtn').addEventListener('click',()=>exportCSV(true));
+function exportCSV(all){
+  const esc2=s=>`"${String(s).replace(/"/g,'""')}"`;
+  let rows=[['주차','이름','배민','쿠팡','합산콜','콜당단가','주간지급액','이벤트','최종지급']];
+  const weeks = all?S.weeks:[curWeek()];
+  weeks.forEach(w=>{ const c=weekCalc(w); c.rows.forEach(r=>{ if(!(r.baemin||r.coupang||r.event))return;
+    rows.push([w.label,r.m.name,r.baemin,r.coupang,Number(r.calls.toFixed(1)),Math.round(c.rate),Math.round(r.pay),Math.round(r.event),Math.round(r.final)]); }); });
+  const csv='﻿'+rows.map(r=>r.map(esc2).join(',')).join('\r\n');
+  dl(new Blob([csv],{type:'text/csv;charset=utf-8;'}), `길드비_${all?'전체':curWeek().label.replace(/[\/.]/g,'')}.csv`);
+  toast('CSV 저장');
+}
+document.getElementById('backupBtn').addEventListener('click',()=>{
+  dl(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}), `길드백업_${todayStr().replace(/\./g,'')}.json`); toast('백업 저장');
+});
+document.getElementById('importBtn').addEventListener('click',()=>document.getElementById('impModal').classList.add('open'));
+document.getElementById('impCloseBtn').addEventListener('click',()=>document.getElementById('impModal').classList.remove('open'));
+document.getElementById('impApplyBtn').addEventListener('click',applyImport);
+function applyImport(){
+  let d; try{ d=JSON.parse(document.getElementById('impText').value); }catch(e){ alert('JSON 형식이 아니에요.'); return; }
+  if(d.members&&d.weeks){ if(!confirm('전체 데이터를 이 백업으로 덮어쓸까요?'))return; S=d; if(!S.settings)S.settings={coupangWeight:0.8}; }
+  else if(d.week){ injectWeek(d.week); }
+  else { alert('알 수 없는 형식입니다. 백업 JSON 또는 {week:{...}} 형식이어야 합니다.'); return; }
+  if(S.currentWeekId==null||!S.weeks.find(w=>w.id===S.currentWeekId)) S.currentWeekId=S.weeks[S.weeks.length-1].id;
+  save(); document.getElementById('impModal').classList.remove('open'); document.getElementById('impText').value='';
+  renderInput(); toast('가져오기 완료');
+}
+function injectWeek(wk){
+  // wk = { label, callRate?, totalFee?, mode?, entries: { 이름: {baemin,coupang,event,eventNote} } }
+  let w=S.weeks.find(x=>x.label===wk.label);
+  if(!w){ w=newWeek(); w.label=wk.label||todayStr(); }
+  if(wk.mode) w.mode=wk.mode;
+  if(wk.callRate!=null) w.callRate=wk.callRate;
+  if(wk.totalFee!=null) w.totalFee=wk.totalFee;
+  Object.entries(wk.entries||{}).forEach(([name,v])=>{
+    let m=S.members.find(x=>x.name.trim()===String(name).trim());
+    if(!m){ m={id:uid(),name:String(name).trim(),active:true}; S.members.push(m); }
+    w.entries[m.id]={ baemin:v.baemin??'', coupang:v.coupang??'', event:v.event??'', eventNote:v.eventNote||'' };
+  });
+  S.currentWeekId=w.id;
+}
+
+/* ===== 정산표 이미지 ===== */
+let lastBlob=null;
+document.getElementById('imgBtn').addEventListener('click',()=>{
+  drawImage(curWeek()).toBlob(b=>{ lastBlob=b; document.getElementById('modalImg').src=URL.createObjectURL(b); document.getElementById('imgModal').classList.add('open'); },'image/png');
+});
+document.getElementById('imgCloseBtn').addEventListener('click',()=>document.getElementById('imgModal').classList.remove('open'));
+document.getElementById('imgSaveBtn').addEventListener('click',async()=>{
+  if(!lastBlob)return; const f=new File([lastBlob],`길드비_${curWeek().label.replace(/[\/.]/g,'')}.png`,{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){ try{ await navigator.share({files:[f],title:'길드비 정산'}); return; }catch(e){} }
+  dl(lastBlob,f.name);
+});
+function drawImage(w){
+  const c=weekCalc(w); const people=c.rows.filter(r=>r.baemin||r.coupang||r.event);
+  const DPR=2,W=720,pad=44,rowH=54,head=150,sum=84,th=34,tot=70,foot=44;
+  const H=head+sum+th+people.length*rowH+tot+foot;
+  const cv=document.createElement('canvas'); cv.width=W*DPR; cv.height=H*DPR;
+  const x=cv.getContext('2d'); x.scale(DPR,DPR);
+  const F="'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif";
+  function rr(px,py,ww,hh,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+ww,py,px+ww,py+hh,r);x.arcTo(px+ww,py+hh,px,py+hh,r);x.arcTo(px,py+hh,px,py,r);x.arcTo(px,py,px+ww,py,r);x.closePath();}
+  x.fillStyle='#f7f5f0';x.fillRect(0,0,W,H);
+  x.textAlign='left';x.fillStyle='#9c7a57';x.font=`700 11px ${F}`;x.fillText('D E L I V E R Y   G U I L D   ·   S E T T L E M E N T',pad,50);
+  x.fillStyle='#232019';x.font=`800 28px ${F}`;x.fillText('길드비 정산 '+w.label,pad,90);
+  x.textAlign='right';x.fillStyle='#948e82';x.font=`14px ${F}`;x.fillText(todayStr(),W-pad,90);
+  x.textAlign='left';x.fillStyle='#948e82';x.font=`13px ${F}`;x.fillText(`인원 ${people.length}명 · 콜당 ${wonN(c.rate)}원 · 쿠팡×${S.settings.coupangWeight}`,pad,116);
+  x.strokeStyle='#232019';x.lineWidth=1.5;x.beginPath();x.moveTo(pad,132);x.lineTo(W-pad,132);x.stroke();
+  let y=head;const stats=[['전체 합산콜',cnt(c.totalCalls),'#5a7d77'],['길드비 분배',wonN(c.guildSum),'#232019'],['이벤트',wonN(c.eventSum),'#a4863f'],['총 지급액',wonN(c.paidSum),'#2f785a']];
+  const sw=(W-pad*2)/4;
+  stats.forEach((s,i)=>{const cx=pad+i*sw; if(i>0){x.strokeStyle='#e0dacd';x.beginPath();x.moveTo(cx,y);x.lineTo(cx,y+54);x.stroke();}
+    x.textAlign='left';x.fillStyle='#a39d90';x.font=`700 10px ${F}`;x.fillText(s[0].toUpperCase(),cx+12,y+20);
+    x.fillStyle=s[2];x.font=`800 20px ${F}`;x.fillText(s[1],cx+12,y+48);});
+  y=head+sum;const cN=pad,cC=W-300,cG=W-160,cP=W-pad;
+  x.fillStyle='#948e82';x.font=`700 11px ${F}`;x.textAlign='left';x.fillText('이름 / 콜',cN,y+8);x.textAlign='center';x.fillText('합산',cC,y+8);x.fillText('길드비',cG,y+8);x.textAlign='right';x.fillText('지급액',cP,y+8);
+  x.strokeStyle='#232019';x.lineWidth=1;x.beginPath();x.moveTo(pad,y+20);x.lineTo(W-pad,y+20);x.stroke();
+  let ry=y+20;
+  people.forEach((r,i)=>{const my=ry+rowH/2;
+    x.textAlign='left';x.fillStyle='#232019';x.font=`700 16px ${F}`;let nm=r.m.name;if(nm.length>11)nm=nm.slice(0,11)+'…';x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my-1);
+    x.fillStyle='#a8a193';x.font=`12px ${F}`;x.fillText(`배민 ${r.baemin} · 쿠팡 ${r.coupang}`,cN,my+17);
+    x.textAlign='center';x.fillStyle='#504b42';x.font=`700 15px ${F}`;x.fillText(cnt(r.calls),cC,my+5);
+    x.fillStyle='#7a746a';x.font=`14px ${F}`;x.fillText(wonN(r.pay),cG,my+5);
+    x.textAlign='right';x.fillStyle='#2a2620';x.font=`800 17px ${F}`;x.fillText(wonN(r.final),cP,my+(r.event>0?-4:4));
+    if(r.event>0){x.fillStyle='#a4863f';x.font=`11px ${F}`;x.fillText(`+이벤트 ${wonN(r.event)}`,cP,my+14);}
+    x.strokeStyle='#e7e2d6';x.beginPath();x.moveTo(pad,ry+rowH);x.lineTo(W-pad,ry+rowH);x.stroke();ry+=rowH;});
+  ry+=8;rr(pad,ry,W-2*pad,50,3);x.fillStyle='#232019';x.fill();
+  x.textAlign='left';x.fillStyle='#fff';x.font=`700 14px ${F}`;x.fillText('총 지급액',pad+18,ry+30);
+  x.textAlign='right';x.fillStyle='#e7c79c';x.font=`800 24px ${F}`;x.fillText(wonN(c.paidSum)+' 원',W-pad-18,ry+33);
+  x.textAlign='center';x.fillStyle='#bbb4a6';x.font=`11px ${F}`;x.fillText('GUILD MANAGER · '+todayStr(),W/2,H-20);
+  return cv;
+}
+
+/* ===== util ===== */
+function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+renderInput();
