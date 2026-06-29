@@ -84,6 +84,13 @@
   .htbl td:first-child{text-align:left;font-weight:600;} .htbl .pay{color:var(--good);font-weight:700;}
   .paychk{cursor:pointer;font-size:11px;font-weight:700;padding:3px 7px;border-radius:14px;border:1px solid var(--line);}
   .paychk.done{background:var(--good);color:#fff;border-color:var(--good);} .paychk.no{background:#fff;color:var(--warn);}
+  .htbl .wkrow{cursor:pointer;} .htbl .wkrow:active{background:var(--surface2);} .htbl .ex{color:var(--sub);font-size:10px;}
+  .htbl .detcell{background:var(--surface2);text-align:left;font-size:12px;color:var(--ink2);padding:10px 8px;line-height:1.8;}
+  .advrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line2);}
+  .advrow.settled{opacity:.5;} .advrow .ai b{color:var(--promo);font-size:15px;}
+  .advtog{font-size:11px;font-weight:700;padding:3px 9px;border-radius:14px;border:1px solid var(--line);cursor:pointer;color:var(--warn);background:#fff;}
+  .advtog.on{background:var(--good);color:#fff;border-color:var(--good);}
+  .advdel{border:none;background:none;color:#b07a66;font-size:17px;cursor:pointer;margin-left:8px;}
 
   .topbar{display:flex;gap:8px;margin-bottom:12px;} .topbar select{flex:1;}
   .modeseg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
@@ -230,7 +237,7 @@ function initial(n){ return (n||'?').trim().slice(0,1); }
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
 function defaultState(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; return {settings:{coupangWeight:0.8},adminPin:'',members:[],weeks:[w],currentWeekId:w.id,_w:CLIENT,_t:Date.now()}; }
 function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.adminPin==null)d.adminPin=''; d.members=d.members||[]; d.weeks=d.weeks||[];
-  d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; });
+  d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; if(!Array.isArray(m.advances))m.advances=[]; });
   if(!d.weeks.length){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; d.weeks.push(w); }
   if(d.currentWeekId==null||!d.weeks.find(w=>w.id===d.currentWeekId)) d.currentWeekId=d.weeks[d.weeks.length-1].id; return d; }
 
@@ -253,8 +260,9 @@ function weekCalc(w){ const wt=S.settings.coupangWeight;
   return {rows,totalCalls,rate,guildSum,eventSum,paidSum:guildSum+eventSum,filledCount:rows.filter(r=>r.filled).length}; }
 function memberAgg(mid){ let cumPay=0,unpaid=0,weeks=0; const series=[];
   S.weeks.forEach(w=>{ const c=weekCalc(w); const r=c.rows.find(x=>x.m.id===mid); if(!r||!r.filled)return; cumPay+=r.final; if(!r.paid)unpaid+=r.final; weeks++;
-    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,paid:r.paid,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event}); });
-  return {cumPay,unpaid,weeks,series}; }
+    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,paid:r.paid,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event,rate:c.rate}); });
+  const mm=S.members.find(x=>x.id===mid); let advOut=0; ((mm&&mm.advances)||[]).forEach(a=>{ if(!a.settled) advOut+=num(a.amount); });
+  return {cumPay,unpaid,weeks,series,advOut,receivable:unpaid-advOut}; }
 
 signInAnonymously(auth).catch(e=>{ $('gateSub').textContent='인증 오류: '+(e.code||e.message); });
 onAuthStateChanged(auth, user=>{ if(!user)return;
@@ -311,7 +319,7 @@ function renderHome(){ const c=weekCalc(curWeek());
     const tw=filled?`이번주 ${cnt(wc.calls)}콜 · ${wonN(wc.final)}원`:'<span style="color:var(--warn)">이번주 미입력</span>';
     return `<div class="mcard ${m.status==='left'?'dim':''}" data-id="${m.id}"><div class="av">${esc(initial(m.name))}</div>
       <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span></div><div class="sub">${tw}</div></div>
-      <div class="amt"><div class="big">${wonN(ag.cumPay)}원</div><div class="${ag.unpaid>0?'nopay':'lil'}">${ag.unpaid>0?'미지급 '+wonN(ag.unpaid):'정산완료'}</div></div></div>`;
+      <div class="amt"><div class="big">${wonN(ag.cumPay)}원</div><div class="${ag.unpaid>0?'nopay':'lil'}">${ag.unpaid>0?'미지급 '+wonN(ag.unpaid):'정산완료'}</div>${ag.advOut>0?`<div class="nopay" style="color:var(--promo)">가불 ${wonN(ag.advOut)}</div>`:''}</div></div>`;
   }).join('');
   box.querySelectorAll('.mcard').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.id)));
 }
@@ -323,23 +331,33 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
   Object.values(secs).forEach(s=>$(s).classList.add('hidden')); const sec=$('sec-detail'); sec.classList.remove('hidden');
   const ag=memberAgg(id); const maxCalls=Math.max(1,...ag.series.map(s=>s.calls));
   const bars=ag.series.slice(-10).map(s=>`<div class="bar"><div class="bv">${Math.round(s.calls)}</div><div class="col" style="height:${Math.max(2,s.calls/maxCalls*86)}px"></div><div class="bl">${esc(s.label)}</div></div>`).join('')||'<div class="muted" style="padding:20px;">아직 기록이 없습니다.</div>';
-  const histRows=[...ag.series].reverse().map(s=>`<tr><td>${esc(s.label)}</td><td>${s.baemin}/${s.coupang}</td><td>${cnt(s.calls)}</td><td class="pay">${wonN(s.final)}</td><td>${admin?`<span class="paychk ${s.paid?'done':'no'}" data-wid="${s.wid}">${s.paid?'지급':'미지급'}</span>`:(s.paid?'<span style="color:var(--good)">지급</span>':'<span style="color:var(--warn)">대기</span>')}</td></tr>`).join('')||'<tr><td colspan=5 class="muted">기록 없음</td></tr>';
+  const w8=S.settings.coupangWeight;
+  const histRows=[...ag.series].reverse().map(s=>{
+    const stat=admin?`<span class="paychk ${s.paid?'done':'no'}" data-wid="${s.wid}">${s.paid?'지급':'미지급'}</span>`:(s.paid?'<span style="color:var(--good)">지급</span>':'<span style="color:var(--warn)">대기</span>');
+    return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${s.baemin||0}/${s.coupang||0}</td><td>${cnt(s.calls)}</td><td class="pay">${wonN(s.final)}</td><td>${stat}</td></tr>`+
+    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="5" class="detcell">배민 <b>${s.baemin||0}</b>건 · 쿠팡 <b>${s.coupang||0}</b>건 ×${w8} · 합산 <b>${cnt(s.calls)}</b>콜<br>콜당 ${wonN(s.rate)}원 → 지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b></td></tr>`;
+  }).join('')||'<tr><td colspan=5 class="muted">기록 없음</td></tr>';
+  const advRows=(m.advances||[]).map(a=>`<div class="advrow ${a.settled?'settled':''}"><div class="ai"><b>${wonN(a.amount)}원</b> <span class="muted">${a.date||''}${a.memo?' · '+esc(a.memo):''}</span></div>${admin?`<div><span class="advtog ${a.settled?'on':''}" data-aid="${a.id}">${a.settled?'상환됨':'미상환'}</span><button class="advdel" data-aid="${a.id}">×</button></div>`:`<span class="muted">${a.settled?'상환됨':'미상환'}</span>`}</div>`).join('')||'<div class="muted">가불 내역 없음</div>';
   sec.innerHTML=`
     ${admin?'<button class="backbtn" id="dBack">← 명부</button>':'<div class="eyebrow">MY SETTLEMENT</div>'}
-    <div class="dhead"><div class="av">${esc(initial(m.name))}</div><div><div class="nm">${esc(m.name)}</div><div class="muted">가입 ${m.joinDate||'-'}</div></div></div>
+    <div class="dhead"><div class="av">${esc(initial(m.name))}</div><div><div class="nm">${esc(m.name)}</div><div class="muted">가입 ${m.joinDate||'-'} · 활동 ${ag.weeks}주</div></div></div>
     ${admin?`<div class="statusseg" id="dStatus">${Object.keys(STATUS).map(k=>`<button data-s="${k}" class="${m.status===k?'on':''}">${STATUS[k]}</button>`).join('')}</div>`:''}
-    <div class="statline" style="margin-bottom:12px;">
+    <div class="statline" style="margin-bottom:10px;">
       <div class="statbox"><div class="k">누적 지급</div><div class="v good">${wonN(ag.cumPay)}</div></div>
       <div class="statbox"><div class="k">미지급</div><div class="v ${ag.unpaid>0?'warn':''}">${wonN(ag.unpaid)}</div></div>
-      <div class="statbox"><div class="k">활동 주차</div><div class="v">${ag.weeks}</div></div></div>
+      <div class="statbox"><div class="k">가불 잔액</div><div class="v ${ag.advOut>0?'warn':''}">${wonN(ag.advOut)}</div></div></div>
+    <div class="card" style="background:var(--ink);color:#e8e4db;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:13px;color:#a39d92;">실수령 예정 <span style="font-size:11px;">(미지급 − 가불)</span></span><b style="font-size:21px;color:#e7c79c;">${wonN(ag.receivable)}</b></div>
     <div class="card"><span class="lbl">콜수 추이</span><div class="chart">${bars}</div></div>
     ${admin?`<div class="card"><span class="lbl">인사 카드</span>
       <div class="frow"><label>가입일</label><input type="date" id="fJoin" value="${m.joinDate||''}"></div>
       <div class="frow"><label>연락처</label><input id="fContact" placeholder="전화/카톡" value="${esc(m.contact||'')}"></div>
       <div class="frow"><label>로그인 PIN</label><input id="fPin" inputmode="numeric" placeholder="유저 로그인용" value="${esc(m.pin||'')}"></div>
       <div class="frow"><label>메모</label><textarea id="fMemo" rows="2" placeholder="특이사항">${esc(m.memo||'')}</textarea></div></div>`:''}
-    <div class="card"><span class="lbl">주차별 기록</span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
+    <div class="card"><span class="lbl">가불 (선지급)</span>${advRows}${admin?'<div class="addbar" style="margin-top:10px;"><input class="fld" id="advAmt" inputmode="numeric" placeholder="금액"><input class="fld" id="advMemo" placeholder="메모(선택)"><button class="btn accent" id="advAdd">추가</button></div>':''}</div>
+    <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세)</span></span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
     ${admin?'<button class="btn block" id="dDel" style="color:#b05;margin-top:4px;">길드원 삭제</button>':''}`;
+  sec.querySelectorAll('.wkrow').forEach(r=>r.addEventListener('click',()=>{ const d=sec.querySelector('#det_'+r.dataset.wid); if(d) d.style.display=(d.style.display==='none'?'':'none'); }));
   if(admin){
     sec.querySelector('#dBack').onclick=()=>go('home');
     sec.querySelectorAll('#dStatus button').forEach(b=>b.onclick=()=>{ m.status=b.dataset.s; pushSave(); openDetail(id); });
@@ -347,7 +365,10 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     sec.querySelector('#fContact').oninput=e=>{ m.contact=e.target.value; scheduleSave(); };
     sec.querySelector('#fPin').oninput=e=>{ m.pin=e.target.value.trim(); scheduleSave(); };
     sec.querySelector('#fMemo').oninput=e=>{ m.memo=e.target.value; scheduleSave(); };
-    sec.querySelectorAll('.paychk').forEach(p=>p.onclick=()=>{ const w=S.weeks.find(x=>x.id===p.dataset.wid); const e=w.entries[id]||(w.entries[id]={}); e.paid=!e.paid; pushSave(); openDetail(id); });
+    sec.querySelectorAll('.paychk').forEach(p=>p.onclick=(ev)=>{ ev.stopPropagation(); const w=S.weeks.find(x=>x.id===p.dataset.wid); const e=w.entries[id]||(w.entries[id]={}); e.paid=!e.paid; pushSave(); openDetail(id); });
+    const advAdd=sec.querySelector('#advAdd'); if(advAdd) advAdd.onclick=()=>{ const amt=num(sec.querySelector('#advAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.advances=m.advances||[]; m.advances.push({id:uid(),date:todayISO(),amount:amt,memo:(sec.querySelector('#advMemo').value||'').trim(),settled:false}); pushSave(); openDetail(id); };
+    sec.querySelectorAll('.advtog').forEach(t=>t.onclick=()=>{ const a=(m.advances||[]).find(x=>x.id===t.dataset.aid); if(a){ a.settled=!a.settled; pushSave(); openDetail(id); } });
+    sec.querySelectorAll('.advdel').forEach(b=>b.onclick=()=>{ if(!confirm('이 가불 기록을 삭제할까요?'))return; m.advances=(m.advances||[]).filter(x=>x.id!==b.dataset.aid); pushSave(); openDetail(id); });
     sec.querySelector('#dDel').onclick=()=>{ if(!confirm(`${m.name}님을 삭제할까요? 기록도 삭제됩니다.`))return; S.members=S.members.filter(x=>x.id!==id); S.weeks.forEach(w=>delete w.entries[id]); pushSave(); go('home'); };
   }
   window.scrollTo(0,0);
