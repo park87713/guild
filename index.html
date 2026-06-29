@@ -92,7 +92,8 @@
   .advtog.on{background:var(--good);color:#fff;border-color:var(--good);}
   .advdel{border:none;background:none;color:#b07a66;font-size:17px;cursor:pointer;margin-left:8px;}
   .mbadge{font-size:10px;font-weight:700;color:#fff;padding:2px 7px;border-radius:10px;}
-  .payadd{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;} .payadd .fld{flex:1;min-width:78px;} .payadd select.fld{flex:0 0 96px;}
+  .payadd{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;} .payadd .fld{flex:1;min-width:78px;} .payadd select.fld{flex:0 0 98px;}
+  .subln{font-size:12px;color:var(--ink2);padding:3px 0;}
 
   .topbar{display:flex;gap:8px;margin-bottom:12px;} .topbar select{flex:1;}
   .modeseg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
@@ -260,14 +261,14 @@ function weekCalc(w){ const wt=S.settings.coupangWeight;
   const rate=w.mode==='total'?(totalCalls>0?num(w.totalFee)/totalCalls:0):num(w.callRate);
   let guildSum=0,eventSum=0; rows.forEach(r=>{ r.pay=r.calls*rate; r.final=r.pay+r.event; guildSum+=r.pay; eventSum+=r.event; });
   return {rows,totalCalls,rate,guildSum,eventSum,paidSum:guildSum+eventSum,filledCount:rows.filter(r=>r.filled).length}; }
-function memberAgg(mid){ let cumPay=0,weeks=0; const series=[];
-  S.weeks.forEach(w=>{ const c=weekCalc(w); const r=c.rows.find(x=>x.m.id===mid); if(!r||!r.filled)return; cumPay+=r.final; weeks++;
-    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event,rate:c.rate}); });
+function memberAgg(mid){ let cumPay=0,unpaid=0,weeks=0; const series=[];
+  S.weeks.forEach(w=>{ const c=weekCalc(w); const r=c.rows.find(x=>x.m.id===mid); if(!r||!r.filled)return; cumPay+=r.final; if(!r.paid)unpaid+=r.final; weeks++;
+    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,paid:r.paid,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event,rate:c.rate}); });
   const mm=S.members.find(x=>x.id===mid)||{};
   let advTaken=0; (mm.advances||[]).forEach(a=>advTaken+=num(a.amount));
-  let repaid=0,disbursed=0; (mm.payouts||[]).forEach(p=>{ const amt=num(p.amount); if(p.method==='가불상환')repaid+=amt; else disbursed+=amt; });
-  const unpaid=cumPay-repaid-disbursed; const advOut=advTaken-repaid;
-  return {cumPay,weeks,series,advTaken,repaid,disbursed,unpaid,advOut,receivable:unpaid-advOut}; }
+  let repaid=0; (mm.payouts||[]).forEach(p=>{ if(p.method==='가불상환')repaid+=num(p.amount); });
+  const advOut=advTaken-repaid;
+  return {cumPay,unpaid,weeks,series,advTaken,repaid,advOut,receivable:unpaid-advOut}; }
 
 signInAnonymously(auth).catch(e=>{ $('gateSub').textContent='인증 오류: '+(e.code||e.message); });
 onAuthStateChanged(auth, user=>{ if(!user)return;
@@ -337,13 +338,19 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
   const ag=memberAgg(id); const maxCalls=Math.max(1,...ag.series.map(s=>s.calls));
   const bars=ag.series.slice(-10).map(s=>`<div class="bar"><div class="bv">${Math.round(s.calls)}</div><div class="col" style="height:${Math.max(2,s.calls/maxCalls*86)}px"></div><div class="bl">${esc(s.label)}</div></div>`).join('')||'<div class="muted" style="padding:20px;">아직 기록이 없습니다.</div>';
   const w8=S.settings.coupangWeight;
-  const histRows=[...ag.series].reverse().map(s=>{
-    return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${s.baemin||0}/${s.coupang||0}</td><td>${cnt(s.calls)}</td><td class="pay">${wonN(s.final)}</td></tr>`+
-    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="4" class="detcell">배민 <b>${s.baemin||0}</b>건 · 쿠팡 <b>${s.coupang||0}</b>건 ×${w8} · 합산 <b>${cnt(s.calls)}</b>콜<br>콜당 ${wonN(s.rate)}원 → 지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b></td></tr>`;
-  }).join('')||'<tr><td colspan=4 class="muted">기록 없음</td></tr>';
-  const advRows=(m.advances||[]).map(a=>`<div class="advrow"><div class="ai"><b>${wonN(a.amount)}원</b> <span class="muted">${a.date||''}${a.memo?' · '+esc(a.memo):''}</span></div>${admin?`<button class="advdel" data-aid="${a.id}">×</button>`:''}</div>`).join('')||'<div class="muted">가불 내역 없음</div>';
   const MCOL={'현금':'#2f785a','계좌이체':'#4a6fa5','가불상환':'#a4863f','기타':'#8c8780'};
-  const payRows=(m.payouts||[]).slice().reverse().map(p=>`<div class="advrow"><div class="ai"><b style="color:${MCOL[p.method]||'#2a2620'}">${wonN(p.amount)}원</b> <span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method||'기타')}</span> <span class="muted">${p.date||''}${p.memo?' · '+esc(p.memo):''}</span></div>${admin?`<button class="advdel" data-pid="${p.id}">×</button>`:''}</div>`).join('')||'<div class="muted">지급/상환 기록 없음</div>';
+  const wlabel=wid=>{ const w=S.weeks.find(x=>x.id===wid); return w?w.label:'미지정'; };
+  const histRows=[...ag.series].reverse().map(s=>{
+    const stat=admin?`<span class="paychk ${s.paid?'done':'no'}" data-wid="${s.wid}">${s.paid?'정산완료':'정산대기'}</span>`:(s.paid?'<span style="color:var(--good)">완료</span>':'<span style="color:var(--warn)">대기</span>');
+    const advs=(m.advances||[]).filter(a=>a.wid===s.wid).map(a=>`<div class="subln"><span class="mbadge" style="background:#a26a7c">가불신청</span> −${wonN(a.amount)}원${a.memo?' · '+esc(a.memo):''}</div>`).join('');
+    const pays=(m.payouts||[]).filter(p=>p.wid===s.wid).map(p=>`<div class="subln"><span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method)}</span> ${wonN(p.amount)}원${p.memo?' · '+esc(p.memo):''}</div>`).join('');
+    const sub=advs+pays;
+    return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${s.baemin||0}/${s.coupang||0}</td><td>${cnt(s.calls)}</td><td class="pay">${wonN(s.final)}</td><td>${stat}</td></tr>`+
+    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="5" class="detcell">배민 <b>${s.baemin||0}</b>건 · 쿠팡 <b>${s.coupang||0}</b>건 ×${w8} · 합산 <b>${cnt(s.calls)}</b>콜<br>콜당 ${wonN(s.rate)}원 → 지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b>${sub?`<div style="margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;">${sub}</div>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan=5 class="muted">기록 없음</td></tr>';
+  const advRows=(m.advances||[]).map(a=>`<div class="advrow"><div class="ai"><b>${wonN(a.amount)}원</b> <span class="muted">${wlabel(a.wid)} 기준${a.memo?' · '+esc(a.memo):''}</span></div>${admin?`<button class="advdel" data-aid="${a.id}">×</button>`:''}</div>`).join('')||'<div class="muted">가불 내역 없음</div>';
+  const payRows=(m.payouts||[]).slice().reverse().map(p=>`<div class="advrow"><div class="ai"><b style="color:${MCOL[p.method]||'#2a2620'}">${wonN(p.amount)}원</b> <span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method||'기타')}</span> <span class="muted">${wlabel(p.wid)} 기준${p.memo?' · '+esc(p.memo):''}</span></div>${admin?`<button class="advdel" data-pid="${p.id}">×</button>`:''}</div>`).join('')||'<div class="muted">지급/상환 기록 없음</div>';
+  const wkSelOpts=S.weeks.map(w=>`<option value="${w.id}" ${w.id===S.currentWeekId?'selected':''}>${esc(w.label)} 기준</option>`).join('');
   sec.innerHTML=`
     ${admin?'<button class="backbtn" id="dBack">← 명부</button>':'<div class="eyebrow">MY SETTLEMENT</div>'}
     <div class="dhead"><div class="av">${esc(initial(m.name))}</div><div><div class="nm">${esc(m.name)}</div><div class="muted">가입 ${m.joinDate||'-'} · 활동 ${ag.weeks}주</div></div></div>
@@ -360,9 +367,9 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
       <div class="frow"><label>연락처</label><input id="fContact" placeholder="전화/카톡" value="${esc(m.contact||'')}"></div>
       <div class="frow"><label>로그인 PIN</label><input id="fPin" inputmode="numeric" placeholder="유저 로그인용" value="${esc(m.pin||'')}"></div>
       <div class="frow"><label>메모</label><textarea id="fMemo" rows="2" placeholder="특이사항">${esc(m.memo||'')}</textarea></div></div>`:''}
-    <div class="card"><span class="lbl">지급 · 상환 기록</span>${payRows}${admin?`<div class="payadd"><input class="fld" id="payAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="payMethod"><option>현금</option><option>계좌이체</option><option>가불상환</option><option>기타</option></select><input class="fld" id="payMemo" placeholder="메모"><button class="btn accent" id="payAdd">추가</button></div>`:''}</div>
-    <div class="card"><span class="lbl">가불 (선지급 받은 돈)</span>${advRows}${admin?'<div class="addbar" style="margin-top:10px;"><input class="fld" id="advAmt" inputmode="numeric" placeholder="금액"><input class="fld" id="advMemo" placeholder="메모(선택)"><button class="btn accent" id="advAdd">추가</button></div>':''}</div>
-    <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세)</span></span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th></tr>${histRows}</table></div>
+    <div class="card"><span class="lbl">지급 · 상환 기록</span>${payRows}${admin?`<div class="payadd"><select class="fld" id="payWid">${wkSelOpts}</select><input class="fld" id="payAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="payMethod"><option>현금</option><option>계좌이체</option><option>가불상환</option><option>기타</option></select><input class="fld" id="payMemo" placeholder="메모"><button class="btn accent" id="payAdd">추가</button></div>`:''}</div>
+    <div class="card"><span class="lbl">가불 (선지급 받은 돈)</span>${advRows}${admin?`<div class="payadd"><select class="fld" id="advWid">${wkSelOpts}</select><input class="fld" id="advAmt" inputmode="numeric" placeholder="금액"><input class="fld" id="advMemo" placeholder="메모(선택)"><button class="btn accent" id="advAdd">추가</button></div>`:''}</div>
+    <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세·가불내역)</span></span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
     ${admin?'<button class="btn block" id="dDel" style="color:#b05;margin-top:4px;">길드원 삭제</button>':''}`;
   sec.querySelectorAll('.wkrow').forEach(r=>r.addEventListener('click',()=>{ const d=sec.querySelector('#det_'+r.dataset.wid); if(d) d.style.display=(d.style.display==='none'?'':'none'); }));
   if(admin){
@@ -372,8 +379,9 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     sec.querySelector('#fContact').oninput=e=>{ m.contact=e.target.value; scheduleSave(); };
     sec.querySelector('#fPin').oninput=e=>{ m.pin=e.target.value.trim(); scheduleSave(); };
     sec.querySelector('#fMemo').oninput=e=>{ m.memo=e.target.value; scheduleSave(); };
-    const advAdd=sec.querySelector('#advAdd'); if(advAdd) advAdd.onclick=()=>{ const amt=num(sec.querySelector('#advAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.advances=m.advances||[]; m.advances.push({id:uid(),date:todayISO(),amount:amt,memo:(sec.querySelector('#advMemo').value||'').trim()}); pushSave(); openDetail(id); };
-    const payAdd=sec.querySelector('#payAdd'); if(payAdd) payAdd.onclick=()=>{ const amt=num(sec.querySelector('#payAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.payouts=m.payouts||[]; m.payouts.push({id:uid(),date:todayISO(),amount:amt,method:sec.querySelector('#payMethod').value,memo:(sec.querySelector('#payMemo').value||'').trim()}); pushSave(); openDetail(id); };
+    sec.querySelectorAll('.paychk').forEach(p=>p.onclick=(ev)=>{ ev.stopPropagation(); const w=S.weeks.find(x=>x.id===p.dataset.wid); const e=w.entries[id]||(w.entries[id]={}); e.paid=!e.paid; pushSave(); openDetail(id); });
+    const advAdd=sec.querySelector('#advAdd'); if(advAdd) advAdd.onclick=()=>{ const amt=num(sec.querySelector('#advAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.advances=m.advances||[]; m.advances.push({id:uid(),date:todayISO(),wid:sec.querySelector('#advWid').value,amount:amt,memo:(sec.querySelector('#advMemo').value||'').trim()}); pushSave(); openDetail(id); };
+    const payAdd=sec.querySelector('#payAdd'); if(payAdd) payAdd.onclick=()=>{ const amt=num(sec.querySelector('#payAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.payouts=m.payouts||[]; m.payouts.push({id:uid(),date:todayISO(),wid:sec.querySelector('#payWid').value,amount:amt,method:sec.querySelector('#payMethod').value,memo:(sec.querySelector('#payMemo').value||'').trim()}); pushSave(); openDetail(id); };
     sec.querySelectorAll('.advdel[data-aid]').forEach(b=>b.onclick=()=>{ if(!confirm('이 가불 기록을 삭제할까요?'))return; m.advances=(m.advances||[]).filter(x=>x.id!==b.dataset.aid); pushSave(); openDetail(id); });
     sec.querySelectorAll('.advdel[data-pid]').forEach(b=>b.onclick=()=>{ if(!confirm('이 지급/상환 기록을 삭제할까요?'))return; m.payouts=(m.payouts||[]).filter(x=>x.id!==b.dataset.pid); pushSave(); openDetail(id); });
     sec.querySelector('#dDel').onclick=()=>{ if(!confirm(`${m.name}님을 삭제할까요? 기록도 삭제됩니다.`))return; S.members=S.members.filter(x=>x.id!==id); S.weeks.forEach(w=>delete w.entries[id]); pushSave(); go('home'); };
