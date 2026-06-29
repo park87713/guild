@@ -215,7 +215,7 @@ const db = getFirestore(fbApp);
 const DOCREF = doc(db, 'guilds', 'main');
 const CLIENT = 'c'+Math.random().toString(36).slice(2,9);
 
-let S=null, ROLE=null, VIEWER=null, DETAIL_ID=null, saveTimer=null, ready=false;
+let S=null, ROLE=null, VIEWER=null, DETAIL_ID=null, saveTimer=null, ready=false, gateShown=false;
 
 const $=id=>document.getElementById(id);
 function num(v){ const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
@@ -263,13 +263,14 @@ onAuthStateChanged(auth, user=>{ if(!user)return;
     const data=snap.data();
     if(ready && data._w===CLIENT){ return; }
     S=migrate(data); ready=true;
-    if(!ROLE) renderGate(); else refreshAll();
+    if(!ROLE){ if(!gateShown) renderGate(); } else refreshAll();
   }, err=>{ $('gateSub').textContent='DB 접근 오류: '+(err.code||err.message); });
 });
 async function initDoc(){ try{ await setDoc(DOCREF, JSON.parse(JSON.stringify(S))); }catch(e){} renderGate(); }
 
 function renderGate(){
   if(!ready){ $('gateSub').textContent='불러오는 중…'; return; }
+  gateShown=true;
   const g=$('gateBody');
   if(!S.adminPin){ $('gateSub').textContent='최초 설정 — 관리자 PIN을 만드세요';
     g.innerHTML=`<input class="fld" id="setPin" inputmode="numeric" placeholder="관리자 PIN (4자리)" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="doSet">시작하기</button>`;
@@ -288,7 +289,7 @@ function gateUser(){ const opts=S.members.filter(m=>m.status!=='left').map(m=>`<
   $('uPin').onkeydown=e=>{ if(e.key==='Enter')$('uGo').click(); }; $('gb').onclick=renderGate; }
 function enter(role){ ROLE=role; $('gate').classList.add('hidden'); $('topright').classList.remove('hidden'); $('syncBadge').classList.remove('hidden');
   if(role==='admin'){ $('nav').classList.remove('hidden'); go('home'); } else { $('nav').classList.add('hidden'); openDetail(VIEWER); } }
-$('logoutBtn').onclick=()=>{ ROLE=null; VIEWER=null; $('gate').classList.remove('hidden'); $('nav').classList.add('hidden'); $('topright').classList.add('hidden'); $('syncBadge').classList.add('hidden'); renderGate(); };
+$('logoutBtn').onclick=()=>{ ROLE=null; VIEWER=null; gateShown=false; $('gate').classList.remove('hidden'); $('nav').classList.add('hidden'); $('topright').classList.add('hidden'); $('syncBadge').classList.add('hidden'); renderGate(); };
 function refreshAll(){ if(ROLE==='admin'){ const on=document.querySelector('.nav button.on'); go(on?on.dataset.sec:'home'); } else if(ROLE==='user'){ openDetail(VIEWER); } }
 
 const secs={home:'sec-home',settle:'sec-settle',notice:'sec-notice',settings:'sec-settings'};
