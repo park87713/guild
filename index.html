@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>길드 관리</title>
+<title>아스트라 정산시스템</title>
 <style>
   :root{
     --bg:#e7e4dc;--surface:#f7f5f0;--surface2:#efece4;--ink:#232019;--ink2:#504b42;
@@ -122,7 +122,7 @@
 <body>
   <div id="gate">
     <div class="logo">🛵</div>
-    <h2>길드 관리</h2>
+    <h2>아스트라 정산시스템</h2>
     <p id="gateSub">불러오는 중…</p>
     <div class="box" id="gateBody"></div>
   </div>
@@ -131,8 +131,8 @@
   <div class="topright hidden" id="topright"><button id="logoutBtn">로그아웃</button></div>
 
   <section id="sec-home" class="hidden">
-    <div class="eyebrow">DELIVERY GUILD · ROSTER</div>
-    <h1 style="margin-bottom:12px;">길드원 관리</h1>
+    <div class="eyebrow">ASTRA · SETTLEMENT</div>
+    <h1 style="margin-bottom:12px;">아스트라 정산시스템</h1>
     <div class="hstrip" id="homeStrip"></div>
     <div class="sectitle"><span class="lbl" style="margin:0;">길드원 <span id="memCount">0</span>명</span>
       <button class="btn sm accent" id="addMemQuick">+ 추가</button></div>
@@ -283,8 +283,8 @@ function gateAdmin(){ $('gateBody').innerHTML=`<input class="fld" id="aPin" inpu
   $('aGo').onclick=()=>{ if($('aPin').value.trim()===S.adminPin) enter('admin'); else $('gerr').textContent='PIN이 틀렸습니다'; };
   $('aPin').onkeydown=e=>{ if(e.key==='Enter')$('aGo').click(); }; $('gb').onclick=renderGate; }
 function gateUser(){ const opts=S.members.filter(m=>m.status!=='left').map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
-  $('gateBody').innerHTML=`<select class="fld" id="uSel">${opts||'<option>등록된 길드원 없음</option>'}</select><input class="fld" id="uPin" inputmode="numeric" placeholder="내 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="uGo">내 정산 보기</button><button class="gback" id="gb">← 뒤로</button>`;
-  $('uGo').onclick=()=>{ const m=S.members.find(x=>x.id===$('uSel').value); if(!m)return; if(!m.pin){ $('gerr').textContent='PIN 미설정 — 관리자에게 문의'; return; }
+  $('gateBody').innerHTML=`<select class="fld" id="uSel"><option value="" selected>접속자 선택</option>${opts}</select><input class="fld" id="uPin" inputmode="numeric" placeholder="내 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="uGo">내 정산 보기</button><button class="gback" id="gb">← 뒤로</button>`;
+  $('uGo').onclick=()=>{ if(!$('uSel').value){ $('gerr').textContent='접속자를 선택하세요'; return; } const m=S.members.find(x=>x.id===$('uSel').value); if(!m)return; if(!m.pin){ $('gerr').textContent='PIN 미설정 — 관리자에게 문의'; return; }
     if($('uPin').value.trim()===m.pin){ VIEWER=m.id; enter('user'); } else $('gerr').textContent='PIN이 틀렸습니다'; };
   $('uPin').onkeydown=e=>{ if(e.key==='Enter')$('uGo').click(); }; $('gb').onclick=renderGate; }
 function enter(role){ ROLE=role; $('gate').classList.add('hidden'); $('topright').classList.remove('hidden'); $('syncBadge').classList.remove('hidden');
