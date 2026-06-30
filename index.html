@@ -253,7 +253,7 @@ function initial(n){ return (n||'?').trim().slice(0,1); }
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
 function defaultState(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; return {settings:{coupangWeight:0.8,threshold:200},adminPin:'',members:[],weeks:[w],opfund:[],currentWeekId:w.id,_w:CLIENT,_t:Date.now()}; }
 function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.settings.threshold==null)d.settings.threshold=200; if(!Array.isArray(d.opfund))d.opfund=[]; if(d.adminPin==null)d.adminPin=''; d.members=d.members||[]; d.weeks=d.weeks||[];
-  d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; if(!Array.isArray(m.advances))m.advances=[]; if(!Array.isArray(m.payouts))m.payouts=[]; });
+  d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; if(m.payMethod==null)m.payMethod='현금'; if(m.account==null)m.account=''; if(!Array.isArray(m.advances))m.advances=[]; if(!Array.isArray(m.payouts))m.payouts=[]; });
   if(!d.weeks.length){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; d.weeks.push(w); }
   if(d.currentWeekId==null||!d.weeks.find(w=>w.id===d.currentWeekId)) d.currentWeekId=d.weeks[d.weeks.length-1].id; return d; }
 
@@ -339,7 +339,7 @@ function renderHome(){ const c=weekCalc(curWeek());
     const wc=filled?weekCalc(curWeek()).rows.find(r=>r.m.id===m.id):null;
     const tw=filled?(wc.under?`이번주 ${cnt(wc.calls)}콜 · <span style="color:var(--coupang)">미달(운영비)</span>`:`이번주 ${cnt(wc.calls)}콜 · ${wonN(wc.final)}원`):'<span style="color:var(--warn)">이번주 미입력</span>';
     return `<div class="mcard ${m.status==='left'?'dim':''}" data-id="${m.id}"><div class="av">${esc(initial(m.name))}</div>
-      <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span></div><div class="sub">${tw}</div></div>
+      <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span></div><div class="sub">${tw} · ${esc(m.payMethod||'현금')}</div></div>
       <div class="amt"><div class="big">${wonN(ag.cumPay)}원</div><div class="${ag.unpaid>0?'nopay':'lil'}">${ag.unpaid>0?'미지급 '+wonN(ag.unpaid):'정산완료'}</div>${ag.advOut>0?`<div class="nopay" style="color:var(--promo)">가불 ${wonN(ag.advOut)}</div>`:''}</div></div>`;
   }).join('');
   box.querySelectorAll('.mcard').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.id)));
@@ -369,7 +369,7 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
   const wkSelOpts=S.weeks.map(w=>`<option value="${w.id}" ${w.id===S.currentWeekId?'selected':''}>${esc(w.label)} 기준</option>`).join('');
   sec.innerHTML=`
     ${admin?'<button class="backbtn" id="dBack">← 명부</button>':'<div class="eyebrow">MY SETTLEMENT</div>'}
-    <div class="dhead"><div class="av">${esc(initial(m.name))}</div><div><div class="nm">${esc(m.name)}</div><div class="muted">가입 ${m.joinDate||'-'} · 활동 ${ag.weeks}주</div></div></div>
+    <div class="dhead"><div class="av">${esc(initial(m.name))}</div><div><div class="nm">${esc(m.name)} <span class="mbadge" style="background:#4a6fa5;vertical-align:middle">${esc(m.payMethod||'현금')}</span></div><div class="muted">가입 ${m.joinDate||'-'} · 활동 ${ag.weeks}주${m.account?' · '+esc(m.account):''}</div></div></div>
     ${admin?`<div class="statusseg" id="dStatus">${Object.keys(STATUS).map(k=>`<button data-s="${k}" class="${m.status===k?'on':''}">${STATUS[k]}</button>`).join('')}</div>`:''}
     <div class="statline" style="margin-bottom:10px;">
       <div class="statbox"><div class="k">누적 정산</div><div class="v good">${wonN(ag.cumPay)}</div></div>
@@ -381,9 +381,11 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     ${admin?`<div class="card"><span class="lbl">인사 카드</span>
       <div class="frow"><label>가입일</label><input type="date" id="fJoin" value="${m.joinDate||''}"></div>
       <div class="frow"><label>연락처</label><input id="fContact" placeholder="전화/카톡" value="${esc(m.contact||'')}"></div>
+      <div class="frow"><label>지급방식</label><select id="fPayMethod" style="flex:1;border:none;background:transparent;font-size:14.5px;outline:none;color:var(--ink);">${['현금','계좌이체','기타'].map(x=>`<option ${m.payMethod===x?'selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="frow"><label>계좌</label><input id="fAccount" placeholder="은행/계좌번호 (이체 시)" value="${esc(m.account||'')}"></div>
       <div class="frow"><label>로그인 PIN</label><input id="fPin" inputmode="numeric" placeholder="유저 로그인용" value="${esc(m.pin||'')}"></div>
       <div class="frow"><label>메모</label><textarea id="fMemo" rows="2" placeholder="특이사항">${esc(m.memo||'')}</textarea></div></div>`:''}
-    <div class="card"><span class="lbl">지급 · 상환 기록</span>${payRows}${admin?`<div class="payadd"><select class="fld" id="payWid">${wkSelOpts}</select><input class="fld" id="payAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="payMethod"><option>현금</option><option>계좌이체</option><option>가불상환</option><option>기타</option></select><input class="fld" id="payMemo" placeholder="메모"><button class="btn accent" id="payAdd">추가</button></div>`:''}</div>
+    <div class="card"><span class="lbl">지급 · 상환 기록</span>${payRows}${admin?`<div class="payadd"><select class="fld" id="payWid">${wkSelOpts}</select><input class="fld" id="payAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="payMethod">${['현금','계좌이체','가불상환','기타'].map(x=>`<option ${m.payMethod===x?'selected':''}>${x}</option>`).join('')}</select><input class="fld" id="payMemo" placeholder="메모"><button class="btn accent" id="payAdd">추가</button></div>`:''}</div>
     <div class="card"><span class="lbl">가불 (선지급 받은 돈)</span>${advRows}${admin?`<div class="payadd"><select class="fld" id="advWid">${wkSelOpts}</select><input class="fld" id="advAmt" inputmode="numeric" placeholder="금액"><input class="fld" id="advMemo" placeholder="메모(선택)"><button class="btn accent" id="advAdd">추가</button></div>`:''}</div>
     <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세·가불내역)</span></span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
     ${admin?'<button class="btn block" id="dDel" style="color:#b05;margin-top:4px;">길드원 삭제</button>':''}`;
@@ -395,6 +397,8 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     sec.querySelector('#fContact').oninput=e=>{ m.contact=e.target.value; scheduleSave(); };
     sec.querySelector('#fPin').oninput=e=>{ m.pin=e.target.value.trim(); scheduleSave(); };
     sec.querySelector('#fMemo').oninput=e=>{ m.memo=e.target.value; scheduleSave(); };
+    sec.querySelector('#fPayMethod').onchange=e=>{ m.payMethod=e.target.value; pushSave(); openDetail(id); };
+    sec.querySelector('#fAccount').oninput=e=>{ m.account=e.target.value; scheduleSave(); };
     sec.querySelectorAll('.paychk').forEach(p=>p.onclick=(ev)=>{ ev.stopPropagation(); const w=S.weeks.find(x=>x.id===p.dataset.wid); const e=w.entries[id]||(w.entries[id]={}); e.paid=!e.paid; pushSave(); openDetail(id); });
     const advAdd=sec.querySelector('#advAdd'); if(advAdd) advAdd.onclick=()=>{ const amt=num(sec.querySelector('#advAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.advances=m.advances||[]; m.advances.push({id:uid(),date:todayISO(),wid:sec.querySelector('#advWid').value,amount:amt,memo:(sec.querySelector('#advMemo').value||'').trim()}); pushSave(); openDetail(id); };
     const payAdd=sec.querySelector('#payAdd'); if(payAdd) payAdd.onclick=()=>{ const amt=num(sec.querySelector('#payAmt').value); if(!amt){toast('금액을 입력하세요');return;} m.payouts=m.payouts||[]; m.payouts.push({id:uid(),date:todayISO(),wid:sec.querySelector('#payWid').value,amount:amt,method:sec.querySelector('#payMethod').value,memo:(sec.querySelector('#payMemo').value||'').trim()}); pushSave(); openDetail(id); };
