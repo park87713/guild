@@ -238,7 +238,7 @@ const db = getFirestore(fbApp);
 const DOCREF = doc(db, 'guilds', 'main');
 const CLIENT = 'c'+Math.random().toString(36).slice(2,9);
 
-let S=null, ROLE=null, VIEWER=null, DETAIL_ID=null, saveTimer=null, ready=false, gateShown=false, maxMembersSeen=0;
+let S=null, ROLE=null, VIEWER=null, DETAIL_ID=null, saveTimer=null, ready=false, gateShown=false, maxMembersSeen=0, curV=0;
 function saveBackup(s){ try{ if(s&&s.members&&s.members.length){ localStorage.setItem('astraBackup', JSON.stringify({t:Date.now(),s})); } }catch(e){} }
 function loadBackup(){ try{ const b=JSON.parse(localStorage.getItem('astraBackup')||'null'); return b&&b.s||null; }catch(e){ return null; } }
 
@@ -253,8 +253,8 @@ function uid(){ return 'id'+Math.random().toString(36).slice(2,9); }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function initial(n){ return (n||'?').trim().slice(0,1); }
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1500); }
-function defaultState(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; return {settings:{coupangWeight:0.8,threshold:200},adminPin:'',members:[],weeks:[w],opfund:[],currentWeekId:w.id,_w:CLIENT,_t:Date.now()}; }
-function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.settings.threshold==null)d.settings.threshold=200; if(!Array.isArray(d.opfund))d.opfund=[]; if(d.adminPin==null)d.adminPin=''; d.members=d.members||[]; d.weeks=d.weeks||[];
+function defaultState(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; return {settings:{coupangWeight:0.8,threshold:200},adminPin:'',members:[],weeks:[w],opfund:[],currentWeekId:w.id,_w:CLIENT,_t:Date.now(),_v:0}; }
+function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.settings.threshold==null)d.settings.threshold=200; if(!Array.isArray(d.opfund))d.opfund=[]; if(d.adminPin==null)d.adminPin=''; if(typeof d._v!=='number')d._v=0; d.members=d.members||[]; d.weeks=d.weeks||[];
   d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; if(m.payMethod==null)m.payMethod='현금'; if(m.account==null)m.account=''; if(!Array.isArray(m.advances))m.advances=[]; if(!Array.isArray(m.payouts))m.payouts=[]; });
   if(!d.weeks.length){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; d.weeks.push(w); }
   if(d.currentWeekId==null||!d.weeks.find(w=>w.id===d.currentWeekId)) d.currentWeekId=d.weeks[d.weeks.length-1].id; return d; }
@@ -262,8 +262,9 @@ function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.setting
 function scheduleSave(){ if(saveTimer)clearTimeout(saveTimer); saveTimer=setTimeout(pushSave,700); }
 async function pushSave(){ if(!S||ROLE!=='admin')return;
   if((!S.members||S.members.length===0) && maxMembersSeen>0){ toast('⚠️ 빈 명단 저장 차단 — 데이터 보호'); return; }
-  S._w=CLIENT; S._t=Date.now();
-  try{ await setDoc(DOCREF, JSON.parse(JSON.stringify(S))); saveBackup(S); flashSync(); }catch(e){ toast('저장 실패: '+(e.code||e.message)); } }
+  S._w=CLIENT; S._t=Date.now(); S._v=curV+1;
+  try{ await setDoc(DOCREF, JSON.parse(JSON.stringify(S))); curV=S._v; saveBackup(S); flashSync(); }
+  catch(e){ if((e.code||'').includes('permission-denied')){ toast('⚠️ 다른 기기에서 먼저 저장됨 — 최신으로 갱신합니다'); } else { toast('저장 실패: '+(e.code||e.message)); } } }
 function flashSync(){ const b=$('syncBadge'); b.classList.remove('hidden'); b.textContent='● 저장됨'; setTimeout(()=>b.textContent='● 동기화됨',1200); }
 
 const STATUS={active:'활동',rest:'휴면',left:'탈퇴'};
@@ -295,8 +296,8 @@ onAuthStateChanged(auth, user=>{ if(!user)return;
   onSnapshot(DOCREF, snap=>{
     if(!snap.exists()){ const bk=loadBackup(); if(bk&&bk.members&&bk.members.length){ S=migrate(bk); ready=true; maxMembersSeen=S.members.length; pushSave(); if(!ROLE){if(!gateShown)renderGate();}else refreshAll(); return; } S=defaultState(); ready=true; initDoc(); return; }
     const data=snap.data();
-    if(ready && data._w===CLIENT){ return; }
-    S=migrate(data); ready=true;
+    if(ready && data._w===CLIENT){ curV=Math.max(curV, data._v||0); return; }
+    S=migrate(data); ready=true; curV=S._v||0;
     if(S.members.length>maxMembersSeen) maxMembersSeen=S.members.length;
     saveBackup(S);
     if(!ROLE){ if(!gateShown) renderGate(); } else refreshAll();
