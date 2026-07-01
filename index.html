@@ -272,12 +272,13 @@ function curWeek(){ return S.weeks.find(w=>w.id===S.currentWeekId)||S.weeks[S.we
 function newWeek(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; S.weeks.push(w); return w; }
 function membersForWeek(w){ const ids=new Set(S.members.filter(inSettle).map(m=>m.id)); Object.keys(w.entries||{}).forEach(id=>ids.add(id)); return S.members.filter(m=>ids.has(m.id)); }
 function weekCalc(w){ const wt=S.settings.coupangWeight; const thr=num(S.settings.threshold)||0;
-  const rows=membersForWeek(w).map(m=>{ const e=w.entries[m.id]||{}; const baemin=num(e.baemin),coupang=num(e.coupang),event=num(e.event); const calls=baemin+coupang*wt;
+  const rows=membersForWeek(w).map(m=>{ const e=w.entries[m.id]||{}; const baemin=num(e.baemin),coupang=num(e.coupang),event=num(e.event); const calls=Math.floor(baemin+coupang*wt);
     return {m,baemin,coupang,event,paid:!!e.paid,filled:!!(e.baemin||e.coupang||e.event),calls,under:(!!(e.baemin||e.coupang) && thr>0 && calls<thr)}; });
   const totalCalls=rows.reduce((s,r)=>s+r.calls,0);
-  const rate=w.mode==='total'?(totalCalls>0?num(w.totalFee)/totalCalls:0):num(w.callRate);
-  let guildSum=0,eventSum=0,poolAmt=0; rows.forEach(r=>{ r.pay=r.calls*rate; r.gross=r.pay+r.event;
+  const rate=w.mode==='total'?(totalCalls>0?Math.floor(num(w.totalFee)/totalCalls):0):num(w.callRate);
+  let guildSum=0,eventSum=0,poolAmt=0; rows.forEach(r=>{ r.pay=Math.floor(r.calls*rate/100)*100; r.gross=r.pay+r.event;
     if(r.under){ r.final=0; poolAmt+=r.pay; } else { r.final=r.gross; guildSum+=r.pay; eventSum+=r.event; } });
+  if(w.mode==='total'){ const fee=num(w.totalFee); if(fee>0) poolAmt=Math.max(0, fee-guildSum); } // 남는금액(미달분+절사분)은 운영비로 보전
   return {rows,totalCalls,rate,guildSum,eventSum,poolAmt,paidSum:guildSum+eventSum,filledCount:rows.filter(r=>r.filled).length,underCount:rows.filter(r=>r.under).length,thr}; }
 function fundCalc(){ let auto=0; S.weeks.forEach(w=>auto+=weekCalc(w).poolAmt); let income=0,expense=0; (S.opfund||[]).forEach(o=>{ const a=num(o.amount); if(a>=0)income+=a; else expense+=a; }); return {auto,income,expense,manual:income+expense,balance:auto+income+expense}; }
 function memberAgg(mid){ let cumPay=0,unpaid=0,weeks=0; const series=[];
