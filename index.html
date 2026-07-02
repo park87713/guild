@@ -154,7 +154,7 @@
   <section id="sec-settle" class="hidden">
     <div class="eyebrow">WEEKLY SETTLEMENT</div>
     <h1 style="margin-bottom:12px;">주간 정산</h1>
-    <div class="topbar"><select class="fld" id="weekSel"></select><button class="btn" id="newWeekBtn">+ 회차</button></div>
+    <div class="topbar"><select class="fld" id="weekSel"></select><button class="btn" id="newWeekBtn">+ 회차</button><button class="btn" id="renWeekBtn" title="회차 이름변경">✏️</button><button class="btn" id="delWeekBtn" title="회차 삭제" style="color:#b05">🗑️</button></div>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:10px;">
         <span class="lbl" style="margin:0;">정산 단가</span>
@@ -222,7 +222,7 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore, doc, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC0bdBp0guOWswuoJ3cGwaZWaX7NuQsIJM",
@@ -257,14 +257,19 @@ function defaultState(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate
 function migrate(d){ if(!d.settings)d.settings={coupangWeight:0.8}; if(d.settings.threshold==null)d.settings.threshold=200; if(!Array.isArray(d.opfund))d.opfund=[]; if(d.adminPin==null)d.adminPin=''; if(typeof d._v!=='number')d._v=0; d.members=d.members||[]; d.weeks=d.weeks||[];
   d.members.forEach(m=>{ if(!m.status)m.status=(m.active===false?'left':'active'); if(m.joinDate==null)m.joinDate=''; if(m.contact==null)m.contact=''; if(m.memo==null)m.memo=''; if(m.pin==null)m.pin=''; if(m.payMethod==null)m.payMethod='현금'; if(m.account==null)m.account=''; if(!Array.isArray(m.advances))m.advances=[]; if(!Array.isArray(m.payouts))m.payouts=[]; });
   if(!d.weeks.length){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; d.weeks.push(w); }
+  d.weeks.sort((a,b)=>wkKey(a.label)-wkKey(b.label)); // 날짜순 정렬 (파싱 불가 라벨은 뒤로)
   if(d.currentWeekId==null||!d.weeks.find(w=>w.id===d.currentWeekId)) d.currentWeekId=d.weeks[d.weeks.length-1].id; return d; }
+function wkKey(label){ const s=String(label||'').trim(); let m=/^(\d{1,2})\/(\d{1,2})/.exec(s); if(m) return 260000+(+m[1])*100+(+m[2]); m=/^(\d{2})\.(\d{1,2})\.(\d{1,2})/.exec(s); if(m) return (+m[1])*10000+(+m[2])*100+(+m[3]); return 999999; }
 
-function scheduleSave(){ if(saveTimer)clearTimeout(saveTimer); saveTimer=setTimeout(pushSave,700); }
+function scheduleSave(){ if(saveTimer)clearTimeout(saveTimer); saveTimer=setTimeout(()=>{saveTimer=null;pushSave();},700); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'&&saveTimer){ clearTimeout(saveTimer); saveTimer=null; pushSave(); } }); // 앱 전환 시 대기중 저장 즉시 실행
 async function pushSave(){ if(!S||ROLE!=='admin')return;
   if((!S.members||S.members.length===0) && maxMembersSeen>0){ toast('⚠️ 빈 명단 저장 차단 — 데이터 보호'); return; }
   S._w=CLIENT; S._t=Date.now(); S._v=curV+1;
   try{ await setDoc(DOCREF, JSON.parse(JSON.stringify(S))); curV=S._v; saveBackup(S); flashSync(); }
-  catch(e){ if((e.code||'').includes('permission-denied')){ toast('⚠️ 다른 기기에서 먼저 저장됨 — 최신으로 갱신합니다'); } else { toast('저장 실패: '+(e.code||e.message)); } } }
+  catch(e){ if((e.code||'').includes('permission-denied')){ toast('⚠️ 다른 기기에서 먼저 저장됨 — 최신으로 갱신합니다'); await resync(); } else { toast('저장 실패: '+(e.code||e.message)); } } }
+async function resync(){ try{ const snap=await getDoc(DOCREF); if(!snap.exists())return; S=migrate(snap.data()); curV=S._v||0;
+  if(S.members.length>maxMembersSeen)maxMembersSeen=S.members.length; saveBackup(S); if(ROLE)refreshAll(); }catch(e){} }
 function flashSync(){ const b=$('syncBadge'); b.classList.remove('hidden'); b.textContent='● 저장됨'; setTimeout(()=>b.textContent='● 동기화됨',1200); }
 
 const STATUS={active:'활동',rest:'휴면',left:'탈퇴'};
@@ -292,6 +297,7 @@ function memberAgg(mid){ let cumPay=0,unpaid=0,weeks=0; const series=[];
   return {cumPay,unpaid,weeks,series,advTaken,repaid,advOut,receivable:unpaid-advOut}; }
 
 signInAnonymously(auth).catch(e=>{ $('gateSub').textContent='인증 오류: '+(e.code||e.message); });
+setTimeout(()=>{ if(!ready){ $('gateSub').textContent='연결이 느립니다 — 인터넷을 확인하세요'; $('gateBody').innerHTML='<button class="btn primary" onclick="location.reload()">다시 시도</button>'; } },10000);
 onAuthStateChanged(auth, user=>{ if(!user)return;
   onSnapshot(DOCREF, snap=>{
     if(!snap.exists()){ const bk=loadBackup(); if(bk&&bk.members&&bk.members.length){ S=migrate(bk); ready=true; maxMembersSeen=S.members.length; pushSave(); if(!ROLE){if(!gateShown)renderGate();}else refreshAll(); return; } S=defaultState(); ready=true; initDoc(); return; }
@@ -310,17 +316,17 @@ function renderGate(){
   gateShown=true;
   const g=$('gateBody');
   if(!S.adminPin){ $('gateSub').textContent='최초 설정 — 관리자 PIN을 만드세요';
-    g.innerHTML=`<input class="fld" id="setPin" inputmode="numeric" placeholder="관리자 PIN (4자리)" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="doSet">시작하기</button>`;
+    g.innerHTML=`<input class="fld" id="setPin" type="password" inputmode="numeric" placeholder="관리자 PIN (4자리)" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="doSet">시작하기</button>`;
     $('doSet').onclick=()=>{ const p=$('setPin').value.trim(); if(p.length<4){ $('gerr').textContent='4자리 이상 입력'; return; } S.adminPin=p; enter('admin'); pushSave(); }; return; }
   $('gateSub').textContent='로그인';
   g.innerHTML=`<button class="btn primary" id="gAdmin">🛠️ 관리자</button><button class="btn" id="gUser">👤 내 정산 보기</button>`;
   $('gAdmin').onclick=gateAdmin; $('gUser').onclick=gateUser;
 }
-function gateAdmin(){ $('gateBody').innerHTML=`<input class="fld" id="aPin" inputmode="numeric" placeholder="관리자 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="aGo">로그인</button><button class="gback" id="gb">← 뒤로</button>`;
+function gateAdmin(){ $('gateBody').innerHTML=`<input class="fld" id="aPin" type="password" inputmode="numeric" placeholder="관리자 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="aGo">로그인</button><button class="gback" id="gb">← 뒤로</button>`;
   $('aGo').onclick=()=>{ if($('aPin').value.trim()===S.adminPin) enter('admin'); else $('gerr').textContent='PIN이 틀렸습니다'; };
   $('aPin').onkeydown=e=>{ if(e.key==='Enter')$('aGo').click(); }; $('gb').onclick=renderGate; }
 function gateUser(){ const opts=S.members.filter(m=>m.status!=='left').map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('');
-  $('gateBody').innerHTML=`<select class="fld" id="uSel"><option value="" selected>접속자 선택</option>${opts}</select><input class="fld" id="uPin" inputmode="numeric" placeholder="내 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="uGo">내 정산 보기</button><button class="gback" id="gb">← 뒤로</button>`;
+  $('gateBody').innerHTML=`<select class="fld" id="uSel"><option value="" selected>접속자 선택</option>${opts}</select><input class="fld" id="uPin" type="password" inputmode="numeric" placeholder="내 PIN" maxlength="6"><div class="gerr" id="gerr"></div><button class="btn primary" id="uGo">내 정산 보기</button><button class="gback" id="gb">← 뒤로</button>`;
   $('uGo').onclick=()=>{ if(!$('uSel').value){ $('gerr').textContent='접속자를 선택하세요'; return; } const m=S.members.find(x=>x.id===$('uSel').value); if(!m)return; if(!m.pin){ $('gerr').textContent='PIN 미설정 — 관리자에게 문의'; return; }
     if($('uPin').value.trim()===m.pin){ VIEWER=m.id; enter('user'); } else $('gerr').textContent='PIN이 틀렸습니다'; };
   $('uPin').onkeydown=e=>{ if(e.key==='Enter')$('uGo').click(); }; $('gb').onclick=renderGate; }
@@ -344,7 +350,7 @@ function renderHome(){ const c=weekCalc(curWeek());
   $('memCount').textContent=S.members.filter(inSettle).length; const box=$('rosterList');
   if(!list.length){ box.innerHTML='<div class="card muted">우측 [+ 추가]로 길드원을 등록하세요.</div>'; return; }
   box.innerHTML=list.map(m=>{ const ag=memberAgg(m.id); const e=curWeek().entries[m.id]||{}; const filled=!!(e.baemin||e.coupang||e.event);
-    const wc=filled?weekCalc(curWeek()).rows.find(r=>r.m.id===m.id):null;
+    const wc=filled?c.rows.find(r=>r.m.id===m.id):null;
     const tw=filled?(wc.under?`이번주 ${cnt(wc.calls)}콜 · <span style="color:var(--coupang)">미달(운영비)</span>`:`이번주 ${cnt(wc.calls)}콜 · ${wonN(wc.final)}원`):'<span style="color:var(--warn)">이번주 미입력</span>';
     return `<div class="mcard ${m.status==='left'?'dim':''}" data-id="${m.id}"><div class="av">${esc(initial(m.name))}</div>
       <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span></div><div class="sub">${tw} · ${esc(m.payMethod||'현금')}</div></div>
@@ -353,7 +359,8 @@ function renderHome(){ const c=weekCalc(curWeek());
   box.querySelectorAll('.mcard').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.id)));
 }
 $('addMemQuick').onclick=()=>{ const name=prompt('새 길드원 이름'); if(name===null)return; const n=name.trim(); if(!n)return;
-  S.members.push({id:uid(),name:n,status:'active',joinDate:todayISO(),contact:'',memo:'',pin:''}); pushSave(); renderHome(); toast('추가됨'); };
+  if(S.members.some(m=>m.name===n) && !confirm(`"${n}" 이름이 이미 있습니다. 그래도 추가할까요?\n(동명이인은 괄호로 구분 권장: ${n}(구분))`))return;
+  S.members.push({id:uid(),name:n,status:'active',joinDate:todayISO(),contact:'',memo:'',pin:'',payMethod:'계좌이체',account:'',advances:[],payouts:[]}); pushSave(); renderHome(); toast('추가됨'); };
 
 function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(!m){ if(ROLE==='admin')go('home'); return; }
   const admin=ROLE==='admin';
@@ -447,15 +454,24 @@ function refreshSettle(){ const w=curWeek(),c=weekCalc(w);
   $('rateHint').textContent=w.mode==='total'?`콜당 단가 = 총길드비 ÷ ${cnt(c.totalCalls)}콜 = ${wonN(c.rate)}원 (자동)`:`합산콜 = 배민 + 쿠팡×${S.settings.coupangWeight} · 지급액 = 합산콜 × 콜당단가`;
 }
 $('weekSel').onchange=e=>{ S.currentWeekId=e.target.value; pushSave(); renderSettle(); };
-$('newWeekBtn').onclick=()=>{ const l=prompt('회차 이름 (예: 6/26)',todayStr()); if(l===null)return; const w=newWeek(); w.label=l.trim()||todayStr(); S.currentWeekId=w.id; pushSave(); renderSettle(); toast('회차 추가'); };
+$('newWeekBtn').onclick=()=>{ const l=prompt('회차 이름 (예: 6/26)',todayStr()); if(l===null)return; const lbl=l.trim()||todayStr();
+  if(S.weeks.some(w=>w.label===lbl) && !confirm(`"${lbl}" 회차가 이미 있습니다. 그래도 만들까요?`))return;
+  const w=newWeek(); w.label=lbl; S.weeks.sort((a,b)=>wkKey(a.label)-wkKey(b.label)); S.currentWeekId=w.id; pushSave(); renderSettle(); toast('회차 추가'); };
+$('renWeekBtn').onclick=()=>{ const w=curWeek(); const l=prompt('회차 이름 변경',w.label); if(l===null)return; const lbl=l.trim(); if(!lbl)return; w.label=lbl; S.weeks.sort((a,b)=>wkKey(a.label)-wkKey(b.label)); pushSave(); renderSettle(); toast('이름 변경됨'); };
+$('delWeekBtn').onclick=()=>{ const w=curWeek(); if(S.weeks.length<=1){ toast('마지막 회차는 삭제할 수 없습니다'); return; }
+  const n=Object.keys(w.entries||{}).length; if(!confirm(`[${w.label}] 회차를 삭제할까요?\n입력된 ${n}명의 기록이 함께 삭제됩니다.`))return;
+  const p=prompt('삭제하려면 관리자 PIN을 입력하세요'); if(p===null||p.trim()!==S.adminPin){ if(p!==null)toast('PIN이 틀렸습니다'); return; }
+  S.weeks=S.weeks.filter(x=>x.id!==w.id); S.currentWeekId=S.weeks[S.weeks.length-1].id; pushSave(); renderSettle(); toast('회차 삭제됨'); };
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{ curWeek().mode=b.dataset.mode; pushSave(); renderSettle(); });
 $('rateInp').oninput=e=>{ curWeek().callRate=e.target.value; scheduleSave(); refreshSettle(); };
 $('totalInp').oninput=e=>{ curWeek().totalFee=e.target.value; scheduleSave(); refreshSettle(); };
-$('goNotice').onclick=()=>go('notice');
+$('goNotice').onclick=()=>{ noticeWid=S.currentWeekId; go('notice'); };
 
-function renderNotice(){ const sel=$('ntWeekSel'); sel.innerHTML=weekOptions(curWeek().id); sel.onchange=()=>{ S.currentWeekId=sel.value; pushSave(); renderNotice(); }; $('noticeText').value=buildNotice(curWeek()); }
+let noticeWid=null;
+function noticeWeek(){ return S.weeks.find(w=>w.id===noticeWid)||curWeek(); }
+function renderNotice(){ const sel=$('ntWeekSel'); const w=noticeWeek(); sel.innerHTML=weekOptions(w.id); sel.onchange=()=>{ noticeWid=sel.value; renderNotice(); }; $('noticeText').value=buildNotice(noticeWeek()); }
 function buildNotice(w){ const c=weekCalc(w); let L=[`📋 길드비 정산 (${w.label})`,`콜당 ${wonN(c.rate)}원 · 전체 ${cnt(c.totalCalls)}콜`,`━━━━━━━━`];
-  c.rows.forEach(r=>{ if(!r.filled)return; if(r.under){ L.push(`${r.m.name} ─ ${cnt(r.calls)}콜 (기준미만·미지급)`); return; } let s=`${r.m.name} ─ 배민${r.baemin}+쿠팡${r.coupang}(×${S.settings.coupangWeight})=${cnt(r.calls)}콜 → ${wonN(r.pay)}원`; if(r.event>0)s+=` +이벤트${wonN(r.event)}=${wonN(r.final)}원`; L.push(s); });
+  c.rows.forEach(r=>{ if(!r.filled)return; if(r.under){ L.push(`${r.m.name} ─ ${cnt(r.calls)}콜 (기준미만·미지급)`); return; } let s=`${r.m.name} ─ 배민${r.baemin}+쿠팡${r.coupang}(×${S.settings.coupangWeight})=${cnt(r.calls)}콜 → ${wonN(r.pay)}원`; if(r.event)s+=` ${r.event>0?'+이벤트':'−차감'}${wonN(Math.abs(r.event))}=${wonN(r.final)}원`; L.push(s); });
   L.push(`━━━━━━━━`,`이벤트 합계 ${wonN(c.eventSum)}원`,`운영비 적립 ${wonN(c.poolAmt)}원`,`총 지급액 ${wonN(c.paidSum)}원`); return L.join('\n'); }
 $('copyNoticeBtn').onclick=()=>{ const t=$('noticeText').value; navigator.clipboard.writeText(t).then(()=>toast('공지 복사됨'),()=>{ const ta=$('noticeText'); ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly',''); toast('복사됨'); }); };
 
@@ -490,13 +506,13 @@ $('resetBtn').onclick=()=>{ const p=prompt('주간기록을 모두 지웁니다(
 function injectWeek(wk){ let w=S.weeks.find(x=>x.label===wk.label); if(!w){ w=newWeek(); w.label=wk.label||todayStr(); }
   if(wk.mode)w.mode=wk.mode; if(wk.callRate!=null)w.callRate=wk.callRate; if(wk.totalFee!=null)w.totalFee=wk.totalFee;
   Object.entries(wk.entries||{}).forEach(([name,v])=>{ let m=S.members.find(x=>x.name.trim()===String(name).trim());
-    if(!m){ m={id:uid(),name:String(name).trim(),status:'active',joinDate:todayISO(),contact:'',memo:'',pin:''}; S.members.push(m); }
+    if(!m){ m={id:uid(),name:String(name).trim(),status:'active',joinDate:todayISO(),contact:'',memo:'',pin:'',payMethod:'계좌이체',account:'',advances:[],payouts:[]}; S.members.push(m); }
     w.entries[m.id]={baemin:v.baemin??'',coupang:v.coupang??'',event:v.event??'',paid:!!v.paid}; }); S.currentWeekId=w.id; }
 
 let lastBlob=null;
-$('imgBtn').onclick=()=>{ drawImage(curWeek()).toBlob(b=>{ lastBlob=b; $('modalImg').src=URL.createObjectURL(b); $('imgModal').classList.add('open'); },'image/png'); };
+$('imgBtn').onclick=()=>{ drawImage(noticeWeek()).toBlob(b=>{ lastBlob=b; $('modalImg').src=URL.createObjectURL(b); $('imgModal').classList.add('open'); },'image/png'); };
 $('imgCloseBtn').onclick=()=>$('imgModal').classList.remove('open');
-$('imgSaveBtn').onclick=async()=>{ if(!lastBlob)return; const f=new File([lastBlob],`길드비_${curWeek().label.replace(/[\/.]/g,'')}.png`,{type:'image/png'});
+$('imgSaveBtn').onclick=async()=>{ if(!lastBlob)return; const f=new File([lastBlob],`길드비_${noticeWeek().label.replace(/[\/.]/g,'')}.png`,{type:'image/png'});
   if(navigator.canShare&&navigator.canShare({files:[f]})){ try{ await navigator.share({files:[f],title:'길드비 정산'}); return; }catch(e){} } dl(lastBlob,f.name); };
 function drawImage(w){ const c=weekCalc(w),people=c.rows.filter(r=>r.filled);const DPR=2,W=720,pad=44,rowH=54,head=150,sum=84,th=34,tot=70,foot=44;
   const H=head+sum+th+people.length*rowH+tot+foot; const cv=document.createElement('canvas'); cv.width=W*DPR;cv.height=H*DPR;
@@ -510,7 +526,7 @@ function drawImage(w){ const c=weekCalc(w),people=c.rows.filter(r=>r.filled);con
   st.forEach((s,i)=>{const cx=pad+i*sw;if(i>0){x.strokeStyle='#e0dacd';x.beginPath();x.moveTo(cx,y);x.lineTo(cx,y+54);x.stroke();}x.textAlign='left';x.fillStyle='#a39d90';x.font=`700 10px ${F}`;x.fillText(s[0].toUpperCase(),cx+12,y+20);x.fillStyle=s[2];x.font=`800 20px ${F}`;x.fillText(s[1],cx+12,y+48);});
   y=head+sum;const cN=pad,cC=W-300,cG=W-160,cP=W-pad;x.fillStyle='#948e82';x.font=`700 11px ${F}`;x.textAlign='left';x.fillText('이름 / 콜',cN,y+8);x.textAlign='center';x.fillText('합산',cC,y+8);x.fillText('길드비',cG,y+8);x.textAlign='right';x.fillText('지급액',cP,y+8);
   x.strokeStyle='#232019';x.lineWidth=1;x.beginPath();x.moveTo(pad,y+20);x.lineTo(W-pad,y+20);x.stroke();let ry=y+20;
-  people.forEach((r,i)=>{const my=ry+rowH/2;x.textAlign='left';x.fillStyle='#232019';x.font=`700 16px ${F}`;let nm=r.m.name;if(nm.length>11)nm=nm.slice(0,11)+'…';x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my-1);x.fillStyle='#a8a193';x.font=`12px ${F}`;x.fillText(`배민 ${r.baemin} · 쿠팡 ${r.coupang}`,cN,my+17);x.textAlign='center';x.fillStyle='#504b42';x.font=`700 15px ${F}`;x.fillText(cnt(r.calls),cC,my+5);x.fillStyle='#7a746a';x.font=`14px ${F}`;x.fillText(wonN(r.pay),cG,my+5);x.textAlign='right';x.fillStyle='#2a2620';x.font=`800 17px ${F}`;x.fillText(wonN(r.final),cP,my+(r.event>0?-4:4));if(r.event>0){x.fillStyle='#a4863f';x.font=`11px ${F}`;x.fillText(`+이벤트 ${wonN(r.event)}`,cP,my+14);}x.strokeStyle='#e7e2d6';x.beginPath();x.moveTo(pad,ry+rowH);x.lineTo(W-pad,ry+rowH);x.stroke();ry+=rowH;});
+  people.forEach((r,i)=>{const my=ry+rowH/2;x.textAlign='left';x.fillStyle='#232019';x.font=`700 16px ${F}`;let nm=r.m.name;if(nm.length>11)nm=nm.slice(0,11)+'…';x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my-1);x.fillStyle='#a8a193';x.font=`12px ${F}`;x.fillText(`배민 ${r.baemin} · 쿠팡 ${r.coupang}`,cN,my+17);x.textAlign='center';x.fillStyle='#504b42';x.font=`700 15px ${F}`;x.fillText(cnt(r.calls),cC,my+5);x.fillStyle='#7a746a';x.font=`14px ${F}`;x.fillText(wonN(r.pay),cG,my+5);x.textAlign='right';x.fillStyle='#2a2620';x.font=`800 17px ${F}`;x.fillText(wonN(r.final),cP,my+(r.event?-4:4));if(r.event){x.fillStyle=r.event>0?'#a4863f':'#b0554f';x.font=`11px ${F}`;x.fillText(`${r.event>0?'+이벤트 ':'−차감 '}${wonN(Math.abs(r.event))}`,cP,my+14);}x.strokeStyle='#e7e2d6';x.beginPath();x.moveTo(pad,ry+rowH);x.lineTo(W-pad,ry+rowH);x.stroke();ry+=rowH;});
   ry+=8;rr(pad,ry,W-2*pad,50,3);x.fillStyle='#232019';x.fill();x.textAlign='left';x.fillStyle='#fff';x.font=`700 14px ${F}`;x.fillText('총 지급액',pad+18,ry+30);x.textAlign='right';x.fillStyle='#e7c79c';x.font=`800 24px ${F}`;x.fillText(wonN(c.paidSum)+' 원',W-pad-18,ry+33);
   x.textAlign='center';x.fillStyle='#bbb4a6';x.font=`11px ${F}`;x.fillText('GUILD MANAGER · '+todayStr(),W/2,H-20);return cv; }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
