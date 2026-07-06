@@ -166,6 +166,7 @@
     </div>
     <div id="memInputs"></div>
     <div class="card summary" id="settleSummary"></div>
+    <button class="btn block" id="paidAllBtn" style="margin-bottom:8px;">✅ 이번주 전원 정산완료</button>
     <button class="btn accent block" id="goNotice" style="margin-bottom:8px;">📢 이 회차 공지 만들기</button>
   </section>
 
@@ -188,8 +189,8 @@
       <div class="row"><input class="fld" id="newAdminPin" inputmode="numeric" placeholder="새 PIN(4자리)"><button class="btn accent" id="saveAdminPin">변경</button></div>
     </div>
     <div class="card"><span class="lbl">데이터</span>
-      <div class="grid2"><button class="btn" id="csvAllBtn">전체 CSV</button><button class="btn" id="backupBtn">백업(JSON)</button><button class="btn" id="importBtn">가져오기</button><button class="btn" id="restoreLocalBtn">자동백업 복원</button><button class="btn" id="resetBtn" style="color:#b05">주간기록 초기화</button></div>
-      <div class="muted" style="margin-top:10px;">스샷 처리 결과(JSON)는 [가져오기]에 붙여넣으면 해당 회차가 입력됩니다.</div>
+      <div class="grid2"><button class="btn" id="csvAllBtn">전체 CSV</button><button class="btn" id="backupBtn">백업(JSON)</button><button class="btn" id="importBtn">가져오기</button><button class="btn" id="restoreLocalBtn">자동백업 복원</button><button class="btn" id="snapListBtn">📅 스냅샷 복원</button><button class="btn" id="resetBtn" style="color:#b05">주간기록 초기화</button></div>
+      <div class="muted" style="margin-top:10px;">스샷 처리 결과(JSON)는 [가져오기]에 붙여넣으면 해당 회차가 입력됩니다.<br>매일 첫 접속 때 그날 상태가 서버에 자동 보관됩니다 → [📅 스냅샷 복원]으로 되돌리기.</div>
     </div>
   </section>
 
@@ -202,6 +203,7 @@
       <div class="payadd"><input class="fld" id="ofAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="ofType"><option value="out">출금 −</option><option value="in">입금 +</option></select><input class="fld" id="ofMemo" placeholder="메모(예: 회식)"><button class="btn accent" id="ofAdd">추가</button></div>
     </div>
     <div class="card"><span class="lbl">회차별 자동 적립 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(기준 미만 귀속분)</span></span><div id="fundAuto"></div></div>
+    <div class="card"><span class="lbl">월별 요약</span><div id="fundMonthly"></div></div>
   </section>
 
   <div class="nav hidden" id="nav">
@@ -222,7 +224,7 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { getFirestore, doc, onSnapshot, setDoc, getDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyC0bdBp0guOWswuoJ3cGwaZWaX7NuQsIJM",
@@ -270,6 +272,9 @@ async function pushSave(){ if(!S||ROLE!=='admin')return;
   catch(e){ if((e.code||'').includes('permission-denied')){ toast('⚠️ 다른 기기에서 먼저 저장됨 — 최신으로 갱신합니다'); await resync(); } else { toast('저장 실패: '+(e.code||e.message)); } } }
 async function resync(){ try{ const snap=await getDoc(DOCREF); if(!snap.exists())return; S=migrate(snap.data()); curV=S._v||0;
   if(S.members.length>maxMembersSeen)maxMembersSeen=S.members.length; saveBackup(S); if(ROLE)refreshAll(); }catch(e){} }
+let snapTried=false; // 하루 1회 서버 스냅샷 (create-only — 이미 있으면 서버가 거부)
+function trySnapshot(){ if(snapTried||!S||!S.members||!S.members.length)return; snapTried=true;
+  setDoc(doc(db,'guilds','main','snapshots',todayISO()), {t:Date.now(), n:S.members.length, w:S.weeks.length, s:JSON.stringify(S)}).catch(()=>{}); }
 function flashSync(){ const b=$('syncBadge'); b.classList.remove('hidden'); b.textContent='● 저장됨'; setTimeout(()=>b.textContent='● 동기화됨',1200); }
 
 const STATUS={active:'활동',rest:'휴면',left:'탈퇴'};
@@ -305,7 +310,7 @@ onAuthStateChanged(auth, user=>{ if(!user)return;
     if(ready && data._w===CLIENT){ curV=Math.max(curV, data._v||0); return; }
     S=migrate(data); ready=true; curV=S._v||0;
     if(S.members.length>maxMembersSeen) maxMembersSeen=S.members.length;
-    saveBackup(S);
+    saveBackup(S); trySnapshot();
     if(!ROLE){ if(!gateShown) renderGate(); } else refreshAll();
   }, err=>{ $('gateSub').textContent='DB 접근 오류: '+(err.code||err.message); });
 });
@@ -353,7 +358,7 @@ function renderHome(){ const c=weekCalc(curWeek());
     const wc=filled?c.rows.find(r=>r.m.id===m.id):null;
     const tw=filled?(wc.under?`이번주 ${cnt(wc.calls)}콜 · <span style="color:var(--coupang)">미달(운영비)</span>`:`이번주 ${cnt(wc.calls)}콜 · ${wonN(wc.final)}원`):'<span style="color:var(--warn)">이번주 미입력</span>';
     return `<div class="mcard ${m.status==='left'?'dim':''}" data-id="${m.id}"><div class="av">${esc(initial(m.name))}</div>
-      <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span></div><div class="sub">${tw} · ${esc(m.payMethod||'현금')}</div></div>
+      <div class="mid"><div class="nm">${esc(m.name)} <span class="badge b-${m.status}">${STATUS[m.status]}</span>${(!m.pin||m.pin==='1234')&&m.status!=='left'?' <span class="badge" style="background:#b08d3e;color:#fff" title="초기 PIN 미변경">🔑1234</span>':''}</div><div class="sub">${tw} · ${esc(m.payMethod||'현금')}</div></div>
       <div class="amt"><div class="big">${wonN(ag.cumPay)}원</div><div class="${ag.unpaid>0?'nopay':'lil'}">${ag.unpaid>0?'미지급 '+wonN(ag.unpaid):'정산완료'}</div>${ag.advOut>0?`<div class="nopay" style="color:var(--promo)">가불 ${wonN(ag.advOut)}</div>`:''}</div></div>`;
   }).join('');
   box.querySelectorAll('.mcard').forEach(el=>el.addEventListener('click',()=>openDetail(el.dataset.id)));
@@ -452,7 +457,16 @@ function refreshSettle(){ const w=curWeek(),c=weekCalc(w);
     <div class="sr"><span class="k">운영비 적립 (기준미만 ${c.underCount}명)</span><span class="v" style="color:#c98b73">${won(c.poolAmt)}</span></div>
     <div class="sr tot"><span class="k">총 지급액</span><span class="v">${won(c.paidSum)}</span></div>`;
   $('rateHint').textContent=w.mode==='total'?`콜당 단가 = 총길드비 ÷ ${cnt(c.totalCalls)}콜 = ${wonN(c.rate)}원 (자동)`:`합산콜 = 배민 + 쿠팡×${S.settings.coupangWeight} · 지급액 = 합산콜 × 콜당단가`;
+  const filled=c.rows.filter(r=>r.filled); const allPaid=filled.length>0&&filled.every(r=>r.paid);
+  const pb=$('paidAllBtn'); pb.textContent=allPaid?'↩ 이번주 전원 정산대기로 되돌리기':`✅ 이번주 전원 정산완료 (${filled.filter(r=>!r.paid).length}명 대기중)`;
+  pb.style.color=allPaid?'#8c8780':'#2f785a';
 }
+$('paidAllBtn').onclick=()=>{ const w=curWeek(); const c=weekCalc(w); const filled=c.rows.filter(r=>r.filled);
+  if(!filled.length){ toast('입력된 인원이 없습니다'); return; }
+  const allPaid=filled.every(r=>r.paid);
+  if(!confirm(allPaid?`[${w.label}] ${filled.length}명 전원을 정산대기로 되돌릴까요?`:`[${w.label}] 입력된 ${filled.length}명 전원을 정산완료로 표시할까요?`))return;
+  filled.forEach(r=>{ const e=w.entries[r.m.id]||(w.entries[r.m.id]={}); e.paid=!allPaid; });
+  pushSave(); renderSettle(); toast(allPaid?'전원 정산대기로 변경':'전원 정산완료 처리'); };
 $('weekSel').onchange=e=>{ S.currentWeekId=e.target.value; pushSave(); renderSettle(); };
 $('newWeekBtn').onclick=()=>{ const l=prompt('회차 이름 (예: 6/26)',todayStr()); if(l===null)return; const lbl=l.trim()||todayStr();
   if(S.weeks.some(w=>w.label===lbl) && !confirm(`"${lbl}" 회차가 이미 있습니다. 그래도 만들까요?`))return;
@@ -488,6 +502,9 @@ function renderFund(){ const f=fundCalc();
   $('fundList').innerHTML=(S.opfund||[]).slice().reverse().map(o=>{ const a=num(o.amount); return `<div class="advrow"><div class="ai"><b style="color:${a<0?'var(--coupang)':'var(--good)'}">${a<0?'':'+'}${wonN(a)}원</b> <span class="muted">${o.date||''}${o.memo?' · '+esc(o.memo):''}</span></div><button class="advdel" data-ofid="${o.id}">×</button></div>`; }).join('')||'<div class="muted">입출금 내역 없음</div>';
   $('fundList').querySelectorAll('[data-ofid]').forEach(b=>b.onclick=()=>{ if(!confirm('이 내역을 삭제할까요?'))return; S.opfund=(S.opfund||[]).filter(x=>x.id!==b.dataset.ofid); pushSave(); renderFund(); });
   $('fundAuto').innerHTML=S.weeks.map(w=>{ const c=weekCalc(w); if(c.poolAmt<=0)return ''; return `<div class="advrow"><div class="ai"><b style="color:#7f6041">+${wonN(c.poolAmt)}원</b> <span class="muted">${esc(w.label)} · 기준미만 ${c.underCount}명</span></div></div>`; }).filter(Boolean).join('')||'<div class="muted">자동 적립 없음 (기준미만 인원 없음)</div>';
+  const byMon={}; S.weeks.forEach(w=>{ const k=wkKey(w.label); if(k>=999999)return; const c=weekCalc(w); if(!c.filledCount)return; const mon=Math.floor(k/100)%100;
+    const o=byMon[mon]||(byMon[mon]={pay:0,pool:0,wk:0}); o.pay+=c.paidSum; o.pool+=c.poolAmt; o.wk++; });
+  $('fundMonthly').innerHTML=Object.keys(byMon).sort((a,b)=>a-b).map(mn=>`<div class="advrow"><div class="ai"><b>${mn}월</b> <span class="muted">(${byMon[mn].wk}회차)</span><br><span style="color:var(--good)">지급 ${wonN(byMon[mn].pay)}원</span> · <span style="color:#7f6041">운영비 +${wonN(byMon[mn].pool)}원</span></div></div>`).join('')||'<div class="muted">데이터 없음</div>';
 }
 $('ofAdd').onclick=()=>{ let amt=num($('ofAmt').value); if(!amt){toast('금액을 입력하세요');return;} amt=Math.abs(amt)*($('ofType').value==='out'?-1:1); S.opfund=S.opfund||[]; S.opfund.push({id:uid(),date:todayISO(),amount:amt,memo:($('ofMemo').value||'').trim()}); $('ofAmt').value='';$('ofMemo').value=''; pushSave(); renderFund(); toast('기록됨'); };
 $('saveAdminPin').onclick=()=>{ const p=$('newAdminPin').value.trim(); if(p.length<4){ toast('4자리 이상'); return; } S.adminPin=p; $('newAdminPin').value=''; pushSave(); toast('관리자 PIN 변경'); };
@@ -496,6 +513,16 @@ $('csvAllBtn').onclick=()=>{ const e2=s=>`"${String(s).replace(/"/g,'""')}"`; le
   dl(new Blob(['﻿'+rows.map(r=>r.map(e2).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}),`길드비_전체.csv`); toast('CSV 저장'); };
 $('backupBtn').onclick=()=>{ dl(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),`길드백업_${todayISO()}.json`); toast('백업 저장'); };
 $('restoreLocalBtn').onclick=()=>{ const bk=loadBackup(); if(!bk||!bk.members||!bk.members.length){ toast('이 기기에 자동백업이 없습니다'); return; } if(!confirm(`이 기기의 마지막 자동백업(멤버 ${bk.members.length}명)으로 복원할까요?`))return; const pin=S.adminPin; S=migrate(bk); if(!S.adminPin)S.adminPin=pin; pushSave(); go('home'); toast('자동백업 복원 완료'); };
+$('snapListBtn').onclick=async()=>{ toast('스냅샷 목록 불러오는 중…');
+  try{ const qs=await getDocs(collection(db,'guilds','main','snapshots'));
+    const items=qs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.id.localeCompare(a.id)).slice(0,30);
+    if(!items.length){ toast('아직 저장된 스냅샷이 없습니다'); return; }
+    const pick=prompt('복원할 날짜를 입력하세요 (아래 목록 중):\n'+items.map(i=>`${i.id} (멤버${i.n||'?'}·주차${i.w||'?'})`).join('\n'), items[0].id);
+    if(pick===null)return; const it=items.find(i=>i.id===pick.trim()); if(!it){ toast('해당 날짜의 스냅샷이 없습니다'); return; }
+    const d=JSON.parse(it.s);
+    if(!confirm(`[${it.id}] 상태로 복원할까요?\n멤버 ${d.members?.length||0}명 · 주차 ${d.weeks?.length||0}개\n\n현재 데이터를 그 시점으로 덮어씁니다.`))return;
+    const pin=S.adminPin; S=migrate(d); if(!S.adminPin)S.adminPin=pin; pushSave(); go('home'); toast('스냅샷 복원 완료');
+  }catch(e){ toast('불러오기 실패: '+(e.code||e.message)); } };
 $('importBtn').onclick=()=>$('impModal').classList.add('open');
 $('impCloseBtn').onclick=()=>$('impModal').classList.remove('open');
 $('impApplyBtn').onclick=()=>{ let d; try{ d=JSON.parse($('impText').value); }catch(e){ alert('JSON 형식이 아니에요.'); return; }
