@@ -183,8 +183,8 @@
   <section id="sec-settings" class="hidden">
     <div class="eyebrow">SETTINGS</div>
     <h1 style="margin-bottom:12px;">설정</h1>
-    <div class="card"><div class="row" style="justify-content:space-between;"><span>쿠팡 가중치 (1콜당)</span><input class="fld" id="weightInp" inputmode="decimal" style="width:90px;text-align:right;"></div>
-      <div class="row" style="justify-content:space-between;margin-top:12px;"><span style="font-size:13px;">길드비 지급 기준 콜수<br><span class="muted" style="font-size:11px;">이 미만은 미지급→운영비 귀속</span></span><input class="fld" id="thrInp" inputmode="numeric" style="width:90px;text-align:right;"></div></div>
+    <div class="card"><input type="hidden" id="weightInp" value="1">
+      <div class="row" style="justify-content:space-between;"><span style="font-size:13px;">길드비 지급 기준 콜수<br><span class="muted" style="font-size:11px;">이 미만은 미지급→운영비 귀속</span></span><input class="fld" id="thrInp" inputmode="numeric" style="width:90px;text-align:right;"></div></div>
     <div class="card"><span class="lbl">관리자 PIN 변경</span>
       <div class="row"><input class="fld" id="newAdminPin" inputmode="numeric" placeholder="새 PIN(4자리)"><button class="btn accent" id="saveAdminPin">변경</button></div>
     </div>
@@ -381,8 +381,8 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     const pays=(m.payouts||[]).filter(p=>p.wid===s.wid).map(p=>`<div class="subln"><span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method)}</span> ${wonN(p.amount)}원${p.memo?' · '+esc(p.memo):''}</div>`).join('');
     const sub=advs+pays;
     const payCell=s.under?'<span style="color:var(--coupang)">미달</span>':`<span class="pay" style="font-weight:700">${wonN(s.final)}</span>`;
-    return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${s.baemin||0}/${s.coupang||0}</td><td>${cnt(s.calls)}</td><td>${payCell}</td><td>${stat}</td></tr>`+
-    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="5" class="detcell">배민 <b>${s.baemin||0}</b>건 · 쿠팡 <b>${s.coupang||0}</b>건 ×${w8} · 합산 <b>${cnt(s.calls)}</b>콜<br>콜당 ${wonN(s.rate)}원 → ${s.under?`<b style="color:var(--coupang)">기준(${num(S.settings.threshold)}콜) 미만 → 미지급, ${wonN(s.pay)}원 운영비 귀속</b>`:`지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b>`}${sub?`<div style="margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;">${sub}</div>`:''}</td></tr>`;
+    return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${cnt(s.calls)}</td><td>${payCell}</td><td>${stat}</td></tr>`+
+    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="4" class="detcell">콜수 <b>${cnt(s.calls)}</b>콜 · 콜당 ${wonN(s.rate)}원 → ${s.under?`<b style="color:var(--coupang)">기준(${num(S.settings.threshold)}콜) 미만 → 미지급, ${wonN(s.pay)}원 운영비 귀속</b>`:`지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b>`}${sub?`<div style="margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;">${sub}</div>`:''}</td></tr>`;
   }).join('')||'<tr><td colspan=5 class="muted">기록 없음</td></tr>';
   const advRows=(m.advances||[]).map(a=>`<div class="advrow"><div class="ai"><b>${wonN(a.amount)}원</b> <span class="muted">${wlabel(a.wid)} 기준${a.memo?' · '+esc(a.memo):''}</span></div>${admin?`<button class="advdel" data-aid="${a.id}">×</button>`:''}</div>`).join('')||'<div class="muted">가불 내역 없음</div>';
   const payRows=(m.payouts||[]).slice().reverse().map(p=>`<div class="advrow"><div class="ai"><b style="color:${MCOL[p.method]||'#2a2620'}">${wonN(p.amount)}원</b> <span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method||'기타')}</span> <span class="muted">${wlabel(p.wid)} 기준${p.memo?' · '+esc(p.memo):''}</span></div>${admin?`<button class="advdel" data-pid="${p.id}">×</button>`:''}</div>`).join('')||'<div class="muted">지급/상환 기록 없음</div>';
@@ -407,7 +407,7 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
       <div class="frow"><label>메모</label><textarea id="fMemo" rows="2" placeholder="특이사항">${esc(m.memo||'')}</textarea></div></div>`:''}
     <div class="card"><span class="lbl">지급 · 상환 기록</span>${payRows}${admin?`<div class="payadd"><select class="fld" id="payWid">${wkSelOpts}</select><input class="fld" id="payAmt" inputmode="numeric" placeholder="금액"><select class="fld" id="payMethod">${['현금','계좌이체','가불상환','기타'].map(x=>`<option ${m.payMethod===x?'selected':''}>${x}</option>`).join('')}</select><input class="fld" id="payMemo" placeholder="메모"><button class="btn accent" id="payAdd">추가</button></div>`:''}</div>
     <div class="card"><span class="lbl">가불 (선지급 받은 돈)</span>${advRows}${admin?`<div class="payadd"><select class="fld" id="advWid">${wkSelOpts}</select><input class="fld" id="advAmt" inputmode="numeric" placeholder="금액"><input class="fld" id="advMemo" placeholder="메모(선택)"><button class="btn accent" id="advAdd">추가</button></div>`:''}</div>
-    <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세·가불내역)</span></span><table class="htbl"><tr><th>회차</th><th>배/쿠</th><th>합산</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
+    <div class="card"><span class="lbl">주차별 기록 <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0;">(행 누르면 상세·가불내역)</span></span><table class="htbl"><tr><th>회차</th><th>콜수</th><th>지급액</th><th>정산</th></tr>${histRows}</table></div>
     ${admin?'<button class="btn block" id="dDel" style="color:#b05;margin-top:4px;">길드원 삭제</button>':''}`;
   sec.querySelectorAll('.wkrow').forEach(r=>r.addEventListener('click',()=>{ const d=sec.querySelector('#det_'+r.dataset.wid); if(d) d.style.display=(d.style.display==='none'?'':'none'); }));
   if(admin){
@@ -439,24 +439,23 @@ function renderSettle(){ const w=curWeek();
   if(!mem.length){ box.innerHTML='<div class="card muted">명부에서 길드원을 먼저 추가하세요.</div>'; }
   else box.innerHTML=mem.map(m=>{ const e=w.entries[m.id]||{};
     return `<div class="prow" data-mid="${m.id}"><div class="nm">${esc(m.name)}${m.status==='left'?' <span class="muted">(탈퇴)</span>':''}</div>
-      <div class="ins"><label><span class="sp-b">배민 ×1</span><input class="i-b" inputmode="numeric" placeholder="0" value="${e.baemin??''}"></label>
-      <label><span class="sp-c">쿠팡 ×${S.settings.coupangWeight}</span><input class="i-c" inputmode="numeric" placeholder="0" value="${e.coupang??''}"></label>
+      <div class="ins"><label><span class="sp-b">콜수</span><input class="i-b" inputmode="numeric" placeholder="0" value="${e.baemin??''}"></label>
       <label><span class="sp-p">이벤트 원</span><input class="i-e" inputmode="numeric" placeholder="0" value="${e.event??''}"></label></div>
-      <div class="res"><span class="cc">합산 <b class="r-c">0</b> 콜</span><span class="pp"><b class="r-p">0 원</b></span></div></div>`; }).join('');
+      <div class="res"><span class="cc"><b class="r-c">0</b> 콜</span><span class="pp"><b class="r-p">0 원</b></span></div></div>`; }).join('');
   box.querySelectorAll('.prow').forEach(p=>{ const mid=p.dataset.mid;
     p.querySelectorAll('input').forEach(i=>i.addEventListener('input',()=>{ const e=w.entries[mid]||(w.entries[mid]={});
-      e.baemin=p.querySelector('.i-b').value; e.coupang=p.querySelector('.i-c').value; e.event=p.querySelector('.i-e').value; scheduleSave(); refreshSettle(); })); });
+      e.baemin=p.querySelector('.i-b').value; e.coupang=''; e.event=p.querySelector('.i-e').value; scheduleSave(); refreshSettle(); })); });
   refreshSettle();
 }
 function refreshSettle(){ const w=curWeek(),c=weekCalc(w);
   document.querySelectorAll('#memInputs .prow').forEach(p=>{ const r=c.rows.find(x=>x.m.id===p.dataset.mid); if(!r)return; p.querySelector('.r-c').textContent=cnt(r.calls); p.querySelector('.r-p').textContent=r.under?'미달(운영비)':won(r.final); });
-  $('settleSummary').innerHTML=`<div class="sr"><span class="k">전체 합산콜</span><span class="v">${cnt(c.totalCalls)}</span></div>
+  $('settleSummary').innerHTML=`<div class="sr"><span class="k">전체 콜수</span><span class="v">${cnt(c.totalCalls)}</span></div>
     <div class="sr"><span class="k">콜당 단가</span><span class="v" style="color:#d4ad84">${wonN(c.rate)} 원</span></div>
     <div class="sr"><span class="k">길드비 분배</span><span class="v">${won(c.guildSum)}</span></div>
     <div class="sr"><span class="k">이벤트 합계</span><span class="v" style="color:#cbb27a">${won(c.eventSum)}</span></div>
     <div class="sr"><span class="k">운영비 적립 (기준미만 ${c.underCount}명)</span><span class="v" style="color:#c98b73">${won(c.poolAmt)}</span></div>
     <div class="sr tot"><span class="k">총 지급액</span><span class="v">${won(c.paidSum)}</span></div>`;
-  $('rateHint').textContent=w.mode==='total'?`콜당 단가 = 총길드비 ÷ ${cnt(c.totalCalls)}콜 = ${wonN(c.rate)}원 (자동)`:`합산콜 = 배민 + 쿠팡×${S.settings.coupangWeight} · 지급액 = 합산콜 × 콜당단가`;
+  $('rateHint').textContent=w.mode==='total'?`콜당 단가 = 총길드비 ÷ ${cnt(c.totalCalls)}콜 = ${wonN(c.rate)}원 (자동)`:`지급액 = 콜수 × 콜당단가`;
   const filled=c.rows.filter(r=>r.filled); const allPaid=filled.length>0&&filled.every(r=>r.paid);
   const pb=$('paidAllBtn'); pb.textContent=allPaid?'↩ 이번주 전원 정산대기로 되돌리기':`✅ 이번주 전원 정산완료 (${filled.filter(r=>!r.paid).length}명 대기중)`;
   pb.style.color=allPaid?'#8c8780':'#2f785a';
@@ -485,7 +484,7 @@ let noticeWid=null;
 function noticeWeek(){ return S.weeks.find(w=>w.id===noticeWid)||curWeek(); }
 function renderNotice(){ const sel=$('ntWeekSel'); const w=noticeWeek(); sel.innerHTML=weekOptions(w.id); sel.onchange=()=>{ noticeWid=sel.value; renderNotice(); }; $('noticeText').value=buildNotice(noticeWeek()); }
 function buildNotice(w){ const c=weekCalc(w); let L=[`📋 길드비 정산 (${w.label})`,`콜당 ${wonN(c.rate)}원 · 전체 ${cnt(c.totalCalls)}콜`,`━━━━━━━━`];
-  c.rows.forEach(r=>{ if(!r.filled)return; if(r.under){ L.push(`${r.m.name} ─ ${cnt(r.calls)}콜 (기준미만·미지급)`); return; } let s=`${r.m.name} ─ 배민${r.baemin}+쿠팡${r.coupang}(×${S.settings.coupangWeight})=${cnt(r.calls)}콜 → ${wonN(r.pay)}원`; if(r.event)s+=` ${r.event>0?'+이벤트':'−차감'}${wonN(Math.abs(r.event))}=${wonN(r.final)}원`; L.push(s); });
+  c.rows.forEach(r=>{ if(!r.filled)return; if(r.under){ L.push(`${r.m.name} ─ ${cnt(r.calls)}콜 (기준미만·미지급)`); return; } let s=`${r.m.name} ─ ${cnt(r.calls)}콜 → ${wonN(r.pay)}원`; if(r.event)s+=` ${r.event>0?'+이벤트':'−차감'}${wonN(Math.abs(r.event))}=${wonN(r.final)}원`; L.push(s); });
   L.push(`━━━━━━━━`,`이벤트 합계 ${wonN(c.eventSum)}원`,`운영비 적립 ${wonN(c.poolAmt)}원`,`총 지급액 ${wonN(c.paidSum)}원`); return L.join('\n'); }
 $('copyNoticeBtn').onclick=()=>{ const t=$('noticeText').value; navigator.clipboard.writeText(t).then(()=>toast('공지 복사됨'),()=>{ const ta=$('noticeText'); ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly',''); toast('복사됨'); }); };
 
@@ -508,8 +507,8 @@ function renderFund(){ const f=fundCalc();
 }
 $('ofAdd').onclick=()=>{ let amt=num($('ofAmt').value); if(!amt){toast('금액을 입력하세요');return;} amt=Math.abs(amt)*($('ofType').value==='out'?-1:1); S.opfund=S.opfund||[]; S.opfund.push({id:uid(),date:todayISO(),amount:amt,memo:($('ofMemo').value||'').trim()}); $('ofAmt').value='';$('ofMemo').value=''; pushSave(); renderFund(); toast('기록됨'); };
 $('saveAdminPin').onclick=()=>{ const p=$('newAdminPin').value.trim(); if(p.length<4){ toast('4자리 이상'); return; } S.adminPin=p; $('newAdminPin').value=''; pushSave(); toast('관리자 PIN 변경'); };
-$('csvAllBtn').onclick=()=>{ const e2=s=>`"${String(s).replace(/"/g,'""')}"`; let rows=[['회차','이름','상태','배민','쿠팡','합산콜','콜당단가','주간지급액','이벤트','최종','정산']];
-  S.weeks.forEach(w=>{ const c=weekCalc(w); c.rows.forEach(r=>{ if(!r.filled)return; rows.push([w.label,r.m.name,STATUS[r.m.status],r.baemin,r.coupang,Number(r.calls.toFixed(1)),Math.round(c.rate),Math.round(r.pay),Math.round(r.event),Math.round(r.final),r.paid?'지급':'미지급']); }); });
+$('csvAllBtn').onclick=()=>{ const e2=s=>`"${String(s).replace(/"/g,'""')}"`; let rows=[['회차','이름','상태','콜수','콜당단가','주간지급액','이벤트','최종','정산']];
+  S.weeks.forEach(w=>{ const c=weekCalc(w); c.rows.forEach(r=>{ if(!r.filled)return; rows.push([w.label,r.m.name,STATUS[r.m.status],Number(r.calls.toFixed(1)),Math.round(c.rate),Math.round(r.pay),Math.round(r.event),Math.round(r.final),r.paid?'지급':'미지급']); }); });
   dl(new Blob(['﻿'+rows.map(r=>r.map(e2).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8;'}),`길드비_전체.csv`); toast('CSV 저장'); };
 $('backupBtn').onclick=()=>{ dl(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),`길드백업_${todayISO()}.json`); toast('백업 저장'); };
 $('restoreLocalBtn').onclick=()=>{ const bk=loadBackup(); if(!bk||!bk.members||!bk.members.length){ toast('이 기기에 자동백업이 없습니다'); return; } if(!confirm(`이 기기의 마지막 자동백업(멤버 ${bk.members.length}명)으로 복원할까요?`))return; const pin=S.adminPin; S=migrate(bk); if(!S.adminPin)S.adminPin=pin; pushSave(); go('home'); toast('자동백업 복원 완료'); };
@@ -547,13 +546,13 @@ function drawImage(w){ const c=weekCalc(w),people=c.rows.filter(r=>r.filled);con
   function rr(px,py,ww,hh,r){x.beginPath();x.moveTo(px+r,py);x.arcTo(px+ww,py,px+ww,py+hh,r);x.arcTo(px+ww,py+hh,px,py+hh,r);x.arcTo(px,py+hh,px,py,r);x.arcTo(px,py,px+ww,py,r);x.closePath();}
   x.fillStyle='#f7f5f0';x.fillRect(0,0,W,H);x.textAlign='left';x.fillStyle='#9c7a57';x.font=`700 11px ${F}`;x.fillText('D E L I V E R Y   G U I L D',pad,50);
   x.fillStyle='#232019';x.font=`800 28px ${F}`;x.fillText('길드비 정산 '+w.label,pad,90);x.textAlign='right';x.fillStyle='#948e82';x.font=`14px ${F}`;x.fillText(todayStr(),W-pad,90);
-  x.textAlign='left';x.fillStyle='#948e82';x.font=`13px ${F}`;x.fillText(`인원 ${people.length}명 · 콜당 ${wonN(c.rate)}원 · 쿠팡×${S.settings.coupangWeight}`,pad,116);
+  x.textAlign='left';x.fillStyle='#948e82';x.font=`13px ${F}`;x.fillText(`인원 ${people.length}명 · 콜당 ${wonN(c.rate)}원`,pad,116);
   x.strokeStyle='#232019';x.lineWidth=1.5;x.beginPath();x.moveTo(pad,132);x.lineTo(W-pad,132);x.stroke();
-  let y=head;const st=[['전체 합산콜',cnt(c.totalCalls),'#5a7d77'],['길드비 분배',wonN(c.guildSum),'#232019'],['이벤트',wonN(c.eventSum),'#a4863f'],['총 지급액',wonN(c.paidSum),'#2f785a']];const sw=(W-pad*2)/4;
+  let y=head;const st=[['전체 콜수',cnt(c.totalCalls),'#5a7d77'],['길드비 분배',wonN(c.guildSum),'#232019'],['이벤트',wonN(c.eventSum),'#a4863f'],['총 지급액',wonN(c.paidSum),'#2f785a']];const sw=(W-pad*2)/4;
   st.forEach((s,i)=>{const cx=pad+i*sw;if(i>0){x.strokeStyle='#e0dacd';x.beginPath();x.moveTo(cx,y);x.lineTo(cx,y+54);x.stroke();}x.textAlign='left';x.fillStyle='#a39d90';x.font=`700 10px ${F}`;x.fillText(s[0].toUpperCase(),cx+12,y+20);x.fillStyle=s[2];x.font=`800 20px ${F}`;x.fillText(s[1],cx+12,y+48);});
-  y=head+sum;const cN=pad,cC=W-300,cG=W-160,cP=W-pad;x.fillStyle='#948e82';x.font=`700 11px ${F}`;x.textAlign='left';x.fillText('이름 / 콜',cN,y+8);x.textAlign='center';x.fillText('합산',cC,y+8);x.fillText('길드비',cG,y+8);x.textAlign='right';x.fillText('지급액',cP,y+8);
+  y=head+sum;const cN=pad,cC=W-300,cG=W-160,cP=W-pad;x.fillStyle='#948e82';x.font=`700 11px ${F}`;x.textAlign='left';x.fillText('이름',cN,y+8);x.textAlign='center';x.fillText('콜수',cC,y+8);x.fillText('길드비',cG,y+8);x.textAlign='right';x.fillText('지급액',cP,y+8);
   x.strokeStyle='#232019';x.lineWidth=1;x.beginPath();x.moveTo(pad,y+20);x.lineTo(W-pad,y+20);x.stroke();let ry=y+20;
-  people.forEach((r,i)=>{const my=ry+rowH/2;x.textAlign='left';x.fillStyle='#232019';x.font=`700 16px ${F}`;let nm=r.m.name;if(nm.length>11)nm=nm.slice(0,11)+'…';x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my-1);x.fillStyle='#a8a193';x.font=`12px ${F}`;x.fillText(`배민 ${r.baemin} · 쿠팡 ${r.coupang}`,cN,my+17);x.textAlign='center';x.fillStyle='#504b42';x.font=`700 15px ${F}`;x.fillText(cnt(r.calls),cC,my+5);x.fillStyle='#7a746a';x.font=`14px ${F}`;x.fillText(wonN(r.pay),cG,my+5);x.textAlign='right';x.fillStyle='#2a2620';x.font=`800 17px ${F}`;x.fillText(wonN(r.final),cP,my+(r.event?-4:4));if(r.event){x.fillStyle=r.event>0?'#a4863f':'#b0554f';x.font=`11px ${F}`;x.fillText(`${r.event>0?'+이벤트 ':'−차감 '}${wonN(Math.abs(r.event))}`,cP,my+14);}x.strokeStyle='#e7e2d6';x.beginPath();x.moveTo(pad,ry+rowH);x.lineTo(W-pad,ry+rowH);x.stroke();ry+=rowH;});
+  people.forEach((r,i)=>{const my=ry+rowH/2;x.textAlign='left';x.fillStyle='#232019';x.font=`700 16px ${F}`;let nm=r.m.name;if(nm.length>13)nm=nm.slice(0,13)+'…';x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my+5);x.textAlign='center';x.fillStyle='#504b42';x.font=`700 15px ${F}`;x.fillText(cnt(r.calls),cC,my+5);x.fillStyle='#7a746a';x.font=`14px ${F}`;x.fillText(wonN(r.pay),cG,my+5);x.textAlign='right';x.fillStyle='#2a2620';x.font=`800 17px ${F}`;x.fillText(wonN(r.final),cP,my+(r.event?-4:4));if(r.event){x.fillStyle=r.event>0?'#a4863f':'#b0554f';x.font=`11px ${F}`;x.fillText(`${r.event>0?'+이벤트 ':'−차감 '}${wonN(Math.abs(r.event))}`,cP,my+14);}x.strokeStyle='#e7e2d6';x.beginPath();x.moveTo(pad,ry+rowH);x.lineTo(W-pad,ry+rowH);x.stroke();ry+=rowH;});
   ry+=8;rr(pad,ry,W-2*pad,50,3);x.fillStyle='#232019';x.fill();x.textAlign='left';x.fillStyle='#fff';x.font=`700 14px ${F}`;x.fillText('총 지급액',pad+18,ry+30);x.textAlign='right';x.fillStyle='#e7c79c';x.font=`800 24px ${F}`;x.fillText(wonN(c.paidSum)+' 원',W-pad-18,ry+33);
   x.textAlign='center';x.fillStyle='#bbb4a6';x.font=`11px ${F}`;x.fillText('GUILD MANAGER · '+todayStr(),W/2,H-20);return cv; }
 function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); URL.revokeObjectURL(a.href); }
