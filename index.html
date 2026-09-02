@@ -162,6 +162,7 @@
       </div>
       <div id="rateWrap" class="rateline"><span class="unit">콜당</span><input id="rateInp" inputmode="numeric" placeholder="80"><span class="unit">원</span></div>
       <div id="totalWrap" class="rateline hidden"><span class="unit">총길드비 ₩</span><input id="totalInp" inputmode="numeric" placeholder="400,000"></div>
+      <div class="rateline" style="margin-top:8px;"><span class="unit">지급 기준</span><input id="thrWeekInp" inputmode="numeric" placeholder="200"><span class="unit">콜 미만 미지급</span></div>
       <div class="muted" id="rateHint" style="margin-top:8px;"></div>
     </div>
     <div id="memInputs"></div>
@@ -282,7 +283,7 @@ function inSettle(m){ return m.status!=='left'; }
 function curWeek(){ return S.weeks.find(w=>w.id===S.currentWeekId)||S.weeks[S.weeks.length-1]; }
 function newWeek(){ const w={id:uid(),label:todayStr(),mode:'rate',callRate:'',totalFee:'',entries:{}}; S.weeks.push(w); return w; }
 function membersForWeek(w){ const ids=new Set(S.members.filter(inSettle).map(m=>m.id)); Object.keys(w.entries||{}).forEach(id=>ids.add(id)); return S.members.filter(m=>ids.has(m.id)); }
-function weekCalc(w){ const wt=S.settings.coupangWeight; const thr=num(S.settings.threshold)||0;
+function weekCalc(w){ const wt=S.settings.coupangWeight; const thr=(w.threshold!==undefined&&w.threshold!==''&&w.threshold!==null)?(num(w.threshold)||0):(num(S.settings.threshold)||0);
   const rows=membersForWeek(w).map(m=>{ const e=w.entries[m.id]||{}; const baemin=num(e.baemin),coupang=num(e.coupang),event=num(e.event); const calls=Math.floor(baemin+coupang*wt);
     return {m,baemin,coupang,event,paid:!!e.paid,filled:!!(e.baemin||e.coupang||e.event),calls,under:(!!(e.baemin||e.coupang) && thr>0 && calls<thr)}; });
   const totalCalls=rows.reduce((s,r)=>s+r.calls,0);
@@ -294,7 +295,7 @@ function weekCalc(w){ const wt=S.settings.coupangWeight; const thr=num(S.setting
 function fundCalc(){ let auto=0; S.weeks.forEach(w=>auto+=weekCalc(w).poolAmt); let income=0,expense=0; (S.opfund||[]).forEach(o=>{ const a=num(o.amount); if(a>=0)income+=a; else expense+=a; }); return {auto,income,expense,manual:income+expense,balance:auto+income+expense}; }
 function memberAgg(mid){ let cumPay=0,unpaid=0,weeks=0; const series=[];
   S.weeks.forEach(w=>{ const c=weekCalc(w); const r=c.rows.find(x=>x.m.id===mid); if(!r||!r.filled)return; cumPay+=r.final; if(!r.paid)unpaid+=r.final; weeks++;
-    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,gross:r.gross,under:r.under,paid:r.paid,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event,rate:c.rate}); });
+    series.push({label:w.label,calls:r.calls,final:r.final,pay:r.pay,gross:r.gross,under:r.under,paid:r.paid,wid:w.id,baemin:r.baemin,coupang:r.coupang,event:r.event,rate:c.rate,thr:c.thr}); });
   const mm=S.members.find(x=>x.id===mid)||{};
   let advTaken=0; (mm.advances||[]).forEach(a=>advTaken+=num(a.amount));
   let repaid=0; (mm.payouts||[]).forEach(p=>{ if(p.method==='가불상환')repaid+=num(p.amount); });
@@ -382,7 +383,7 @@ function openDetail(id){ DETAIL_ID=id; const m=S.members.find(x=>x.id===id); if(
     const sub=advs+pays;
     const payCell=s.under?'<span style="color:var(--coupang)">미달</span>':`<span class="pay" style="font-weight:700">${wonN(s.final)}</span>`;
     return `<tr class="wkrow" data-wid="${s.wid}"><td>${esc(s.label)} <span class="ex">▾</span></td><td>${cnt(s.calls)}</td><td>${payCell}</td><td>${stat}</td></tr>`+
-    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="4" class="detcell">콜수 <b>${cnt(s.calls)}</b>콜 · 콜당 ${wonN(s.rate)}원 → ${s.under?`<b style="color:var(--coupang)">기준(${num(S.settings.threshold)}콜) 미만 → 미지급, ${wonN(s.pay)}원 운영비 귀속</b>`:`지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b>`}${sub?`<div style="margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;">${sub}</div>`:''}</td></tr>`;
+    `<tr class="wkdet" id="det_${s.wid}" style="display:none"><td colspan="4" class="detcell">콜수 <b>${cnt(s.calls)}</b>콜 · 콜당 ${wonN(s.rate)}원 → ${s.under?`<b style="color:var(--coupang)">기준(${cnt(s.thr)}콜) 미만 → 미지급, ${wonN(s.pay)}원 운영비 귀속</b>`:`지급 ${wonN(s.pay)}원${num(s.event)?` · 이벤트 ${wonN(s.event)}원`:''} = <b style="color:var(--good)">${wonN(s.final)}</b>`}${sub?`<div style="margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;">${sub}</div>`:''}</td></tr>`;
   }).join('')||'<tr><td colspan=5 class="muted">기록 없음</td></tr>';
   const advRows=(m.advances||[]).map(a=>`<div class="advrow"><div class="ai"><b>${wonN(a.amount)}원</b> <span class="muted">${wlabel(a.wid)} 기준${a.memo?' · '+esc(a.memo):''}</span></div>${admin?`<button class="advdel" data-aid="${a.id}">×</button>`:''}</div>`).join('')||'<div class="muted">가불 내역 없음</div>';
   const payRows=(m.payouts||[]).slice().reverse().map(p=>`<div class="advrow"><div class="ai"><b style="color:${MCOL[p.method]||'#2a2620'}">${wonN(p.amount)}원</b> <span class="mbadge" style="background:${MCOL[p.method]||'#8c8780'}">${esc(p.method||'기타')}</span> <span class="muted">${wlabel(p.wid)} 기준${p.memo?' · '+esc(p.memo):''}</span></div>${admin?`<button class="advdel" data-pid="${p.id}">×</button>`:''}</div>`).join('')||'<div class="muted">지급/상환 기록 없음</div>';
@@ -435,6 +436,7 @@ function renderSettle(){ const w=curWeek();
   document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===w.mode));
   $('rateWrap').classList.toggle('hidden',w.mode!=='rate'); $('totalWrap').classList.toggle('hidden',w.mode!=='total');
   $('rateInp').value=w.callRate||''; $('totalInp').value=w.totalFee||'';
+  $('thrWeekInp').value=(w.threshold!==undefined&&w.threshold!==null&&w.threshold!=='')?w.threshold:(S.settings.threshold??'');
   const mem=membersForWeek(w); const box=$('memInputs');
   if(!mem.length){ box.innerHTML='<div class="card muted">명부에서 길드원을 먼저 추가하세요.</div>'; }
   else box.innerHTML=mem.map(m=>{ const e=w.entries[m.id]||{};
@@ -478,6 +480,7 @@ $('delWeekBtn').onclick=()=>{ const w=curWeek(); if(S.weeks.length<=1){ toast('�
 document.querySelectorAll('#modeSeg button').forEach(b=>b.onclick=()=>{ curWeek().mode=b.dataset.mode; pushSave(); renderSettle(); });
 $('rateInp').oninput=e=>{ curWeek().callRate=e.target.value; scheduleSave(); refreshSettle(); };
 $('totalInp').oninput=e=>{ curWeek().totalFee=e.target.value; scheduleSave(); refreshSettle(); };
+$('thrWeekInp').oninput=e=>{ curWeek().threshold=e.target.value; scheduleSave(); refreshSettle(); };
 $('goNotice').onclick=()=>{ noticeWid=S.currentWeekId; go('notice'); };
 
 let noticeWid=null;
