@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>아스트라 정산 계산기</title>
+<style>
+  :root{
+    --bg:#e7e4dc;--surface:#f7f5f0;--surface2:#efece4;--ink:#232019;--ink2:#504b42;
+    --sub:#948e82;--line:#d6d0c4;--line2:#e4dfd4;--accent:#9c7a57;--accent-dark:#7f6041;
+    --good:#2f785a;--warn:#b06a3a;--bad:#a2554f;--under:#a26a7c;--promo:#a4863f;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0 auto;font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Segoe UI",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
+    max-width:720px;padding:16px 12px 40px;overflow-x:hidden;}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.5px;margin:2px 2px 4px;}
+  .eyebrow{font-size:10px;letter-spacing:2.5px;color:var(--accent);font-weight:700;text-transform:uppercase;margin:2px;}
+  .lead{font-size:13px;color:var(--sub);margin:0 2px 14px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:15px;margin-bottom:12px;}
+  .lbl{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;}
+  .lbl .step{background:var(--ink);color:#fff;border-radius:10px;padding:1px 8px;margin-right:6px;letter-spacing:0;}
+  input,button,textarea{font-family:inherit;}
+  .fld{width:100%;padding:10px 11px;background:#fff;border:1px solid var(--line2);border-radius:6px;color:var(--ink);font-size:15px;outline:none;}
+  .fld:focus{border-color:var(--accent);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .f label{display:block;font-size:12px;color:var(--ink2);font-weight:700;margin-bottom:4px;}
+  .f .hint{font-size:11px;color:var(--sub);margin-top:3px;}
+  .btn{padding:10px 13px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink2);font-size:13px;font-weight:700;cursor:pointer;}
+  .btn:active{background:var(--surface2);}
+  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn.accent{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.ghost{background:transparent;}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+  .seg{display:flex;background:var(--surface2);border-radius:6px;padding:3px;gap:3px;margin-bottom:12px;}
+  .seg button{flex:1;border:none;background:transparent;padding:8px;border-radius:4px;font-size:13px;font-weight:700;color:var(--sub);cursor:pointer;}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08);}
+  .chk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink2);margin-top:10px;}
+  /* 입력 행 */
+  .rows{display:flex;flex-direction:column;gap:6px;}
+  .r{display:grid;grid-template-columns:24px 1fr 92px 26px;gap:6px;align-items:center;}
+  .r.ev{grid-template-columns:24px 1fr 84px 80px 26px;}
+  .r .no{font-size:11px;color:var(--sub);text-align:right;font-variant-numeric:tabular-nums;}
+  .r .fld{padding:9px 10px;font-size:15px;}
+  .r .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .r .x{border:none;background:none;color:var(--sub);font-size:18px;cursor:pointer;padding:0;}
+  .r .out{grid-column:2 / -1;font-size:12px;margin:-2px 0 4px 2px;color:var(--sub);}
+  .r .out b{color:var(--good);} .r .out .u{color:var(--under);font-weight:700;}
+  .rhead{display:grid;grid-template-columns:24px 1fr 92px 26px;gap:6px;font-size:11px;color:var(--sub);font-weight:700;margin-bottom:4px;}
+  .rhead.ev{grid-template-columns:24px 1fr 84px 80px 26px;}
+  .rhead span:nth-child(3),.rhead span:nth-child(4){text-align:right;}
+  /* 검산 */
+  .check{border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:14px;font-weight:700;border:1px solid;}
+  .check.ok{background:#e6f1eb;border-color:#b9d8c7;color:var(--good);}
+  .check.bad{background:#f6e7e3;border-color:#e3c1b8;color:var(--bad);}
+  .check.none{background:var(--surface2);border-color:var(--line2);color:var(--sub);font-weight:600;}
+  .check small{display:block;font-weight:500;font-size:12px;margin-top:2px;}
+  /* 결과 */
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+  .st{background:#fff;border:1px solid var(--line2);border-radius:6px;padding:10px 12px;}
+  .st .k{font-size:11px;color:var(--sub);font-weight:700;}
+  .st .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .st .v.g{color:var(--good);} .st .v.a{color:var(--accent-dark);}
+  .st .s{font-size:11px;color:var(--sub);}
+  .tw{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;}
+  th{font-size:11px;color:var(--sub);text-align:right;padding:6px 6px;border-bottom:1.5px solid var(--ink);}
+  th:first-child,td:first-child{text-align:left;}
+  td{padding:8px 6px;border-bottom:1px solid var(--line2);text-align:right;}
+  tr.under td{color:var(--sub);} tr.under td.p{color:var(--under);font-weight:700;}
+  td.p{font-weight:800;color:var(--ink);}
+  tfoot td{font-weight:800;border-top:1.5px solid var(--ink);border-bottom:none;}
+  textarea.notice{width:100%;min-height:240px;font-size:13px;line-height:1.6;padding:12px;border:1px solid var(--line2);border-radius:6px;background:#fff;resize:vertical;font-family:inherit;}
+  details{font-size:14px;}
+  details summary{cursor:pointer;font-weight:800;}
+  details ol{padding-left:20px;margin:10px 0 4px;} details li{margin-bottom:6px;}
+  details .rule{background:#fff;border:1px solid var(--line2);border-radius:6px;padding:10px 12px;font-size:13px;margin-top:8px;}
+  .modal{position:fixed;inset:0;background:rgba(35,32,25,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:10;}
+  .modal.open{display:flex;}
+  .mbox{background:var(--surface);border-radius:10px;padding:16px;width:100%;max-width:520px;max-height:90vh;overflow:auto;}
+  .mbox img{width:100%;border-radius:6px;border:1px solid var(--line);}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20;}
+  .toast.show{opacity:1;}
+  .muted{color:var(--sub);font-size:12px;}
+</style>
+</head>
+<body>
+  <div class="eyebrow">ASTRA · SETTLEMENT CALCULATOR</div>
+  <h1>길드비 정산 계산기</h1>
+  <p class="lead">스샷을 보고 콜수만 입력하면 단가·지급액·운영비·공지까지 자동으로 계산됩니다. 입력 내용은 이 기기에 자동 저장됩니다.</p>
+
+  <!-- 1. 설정 -->
+  <div class="card">
+    <div class="lbl"><span><span class="step">1</span>이번 주 설정</span></div>
+    <div class="seg" id="modeSeg"><button data-mode="total">회식비 총액으로 나누기</button><button data-mode="rate">콜당 단가 직접 입력</button></div>
+    <div class="grid2">
+      <div class="f"><label>주차 이름</label><input class="fld" id="label" placeholder="예: 10/6"></div>
+      <div class="f"><label>기간 (선택)</label><input class="fld" id="period" placeholder="예: 9/30 ~ 10/6"></div>
+      <div class="f" id="feeWrap"><label>회식비 총액 (원)</label><input class="fld num" id="fee" inputmode="numeric" placeholder="360,000"></div>
+      <div class="f hidden" id="rateWrap" style="display:none"><label>콜당 단가 (원)</label><input class="fld num" id="rateIn" inputmode="numeric" placeholder="80"></div>
+      <div class="f"><label>지급 기준 (콜)</label><input class="fld num" id="thr" inputmode="numeric" placeholder="200"><div class="hint">이 콜수 <b>미만</b>은 미지급 → 운영비</div></div>
+      <div class="f"><label>스샷 총 완료 (검산용)</label><input class="fld num" id="header" inputmode="decimal" placeholder="예: 3,675.9"><div class="hint">스샷 맨 위 '총 완료' 숫자</div></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="useEv"> 이벤트 금액(보너스 +, 차감 −) 함께 입력</label>
+  </div>
+
+  <!-- 2. 콜수 입력 -->
+  <div class="card">
+    <div class="lbl"><span><span class="step">2</span>길드원 콜수 (배민+쿠팡 합산)</span><span id="cntLbl"></span></div>
+    <div class="rhead" id="rhead"><span></span><span>이름</span><span>콜수</span><span></span></div>
+    <div class="rows" id="rows"></div>
+    <div class="btns">
+      <button class="btn" id="addBtn">+ 한 명 추가</button>
+      <button class="btn" id="pasteBtn">📋 한꺼번에 붙여넣기</button>
+      <button class="btn ghost" id="newWeekBtn">새 주차 시작</button>
+    </div>
+    <div class="muted" style="margin-top:8px;">소수점 그대로 입력하세요(예: 339.8). 계산할 때 소수점은 버립니다. 0이나 빈칸은 이번 주 미참여로 처리됩니다.</div>
+  </div>
+
+  <div id="check" class="check none"></div>
+
+  <!-- 3. 결과 -->
+  <div class="card">
+    <div class="lbl"><span><span class="step">3</span>정산 결과</span></div>
+    <div class="stats" id="stats"></div>
+    <div class="tw"><table id="tbl"></table></div>
+  </div>
+
+  <!-- 4. 공지 -->
+  <div class="card">
+    <div class="lbl"><span><span class="step">4</span>단톡방 공지</span></div>
+    <textarea class="notice" id="notice" readonly></textarea>
+    <div class="btns"><button class="btn primary" id="copyBtn">📋 공지 복사</button><button class="btn accent" id="imgBtn">🖼️ 정산표 이미지</button><button class="btn" id="csvBtn">CSV 저장</button></div>
+  </div>
+
+  <!-- 사용법 -->
+  <div class="card">
+    <details id="help">
+      <summary>📖 사용 방법 · 정산 규칙</summary>
+      <ol>
+        <li><b>새 주차 시작</b>을 누르면 이름은 남고 콜수만 비워집니다. 주차 이름을 바꿔 주세요.</li>
+        <li>스샷 맨 위의 <b>회식비</b>와 <b>총 완료</b>를 입력합니다. 지급 기준(보통 200 또는 250콜)을 확인합니다.</li>
+        <li>스샷 순서대로 각 사람의 <b>배민+쿠팡 합산</b> 숫자를 입력합니다. 처음 보는 사람은 <b>+ 한 명 추가</b>.</li>
+        <li>노란 검산 칸이 <b>✅ 일치</b>인지 확인합니다. ⚠️ 차이가 나면 빠진 사람이나 잘못 친 숫자가 있는지 봅니다.</li>
+        <li><b>공지 복사</b> 또는 <b>정산표 이미지</b>로 단톡방에 올립니다.</li>
+      </ol>
+      <div class="rule">
+        <b>계산 규칙</b><br>
+        · 개인 콜수 = 합산 건수의 소수점 버림 (339.8 → 339)<br>
+        · 콜당 단가 = 회식비 ÷ 전체 콜수 (1원 미만 버림)<br>
+        · 지급액 = 콜수 × 단가, <b>100원 미만 버림</b><br>
+        · 기준 콜수 미만은 미지급 → 그 몫은 운영비<br>
+        · 운영비 = 회식비 − 지급액 합계 (미달분 + 버림 잔돈)<br>
+        · 미달자도 전체 콜수에는 포함됩니다
+      </div>
+      <div class="rule"><b>붙여넣기 형식</b> — 한 줄에 한 명, "이름 숫자"<br><span class="muted">오태환 339.8<br>정성엽 339.7<br>박기태 283</span></div>
+    </details>
+  </div>
+
+  <div class="modal" id="pasteModal"><div class="mbox">
+    <div class="lbl"><span>한꺼번에 붙여넣기</span></div>
+    <textarea class="notice" id="pasteText" style="min-height:200px" placeholder="오태환 339.8&#10;정성엽 339.7&#10;박기태 283"></textarea>
+    <div class="muted" style="margin:6px 0 10px;">이미 있는 이름은 콜수만 바뀌고, 없는 이름은 새로 추가됩니다.</div>
+    <div class="btns"><button class="btn accent" id="pasteApply">적용</button><button class="btn" id="pasteClose">닫기</button></div>
+  </div></div>
+  <div class="modal" id="imgModal"><div class="mbox"><img id="imgView" alt="정산표">
+    <div class="btns"><button class="btn accent" id="imgSave">저장 / 공유</button><button class="btn" id="imgClose">닫기</button></div>
+  </div></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+/*CALC-START*/
+// 정산 계산 (기존 아스트라 정산시스템 weekCalc와 동일 규칙)
+function num(v){ const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function calc(st){
+  const thr=num(st.thr);
+  const rows=st.rows.map(r=>{ const raw=num(r.calls), event=st.useEv?num(r.event):0; const calls=Math.floor(raw);
+    return {name:(r.name||'').trim(),raw,calls,event,filled:raw>0||event!==0,under:raw>0&&thr>0&&calls<thr}; });
+  const totalCalls=rows.reduce((s,r)=>s+(r.raw>0?r.calls:0),0);
+  const rawSum=rows.reduce((s,r)=>s+r.raw,0);
+  const rate=st.mode==='rate'?Math.floor(num(st.rate)):(totalCalls>0?Math.floor(num(st.fee)/totalCalls):0);
+  let guildSum=0,eventSum=0,underPay=0;
+  rows.forEach(r=>{ r.pay=Math.floor(r.calls*rate/100)*100; if(r.raw<=0)r.pay=0;
+    if(r.under){ r.final=0; underPay+=r.pay; } else { r.final=r.pay+r.event; guildSum+=r.pay; eventSum+=r.event; } });
+  const fee=num(st.fee);
+  const pool=st.mode==='rate'?underPay:(fee>0?Math.max(0,fee-guildSum):0);
+  const paid=rows.filter(r=>r.filled&&!r.under), under=rows.filter(r=>r.under);
+  return {rows,totalCalls,rawSum,rate,guildSum,eventSum,paidSum:guildSum+eventSum,pool,thr,paid,under,fee};
+}
+/*CALC-END*/
+
+const $=id=>document.getElementById(id);
+const KEY='astraCalc.v1';
+const won=n=>Math.round(n).toLocaleString('ko-KR');
+const one=n=>Number(n.toFixed(1)).toLocaleString('ko-KR',{minimumFractionDigits:1,maximumFractionDigits:1});
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove('show'),1600); }
+
+let S={mode:'total',label:'',period:'',fee:'',rate:'',thr:'200',header:'',useEv:false,rows:[{name:'',calls:'',event:''}]};
+try{ const s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&Array.isArray(s.rows)) S=Object.assign(S,s); }catch(e){}
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+
+// 설정 입력 바인딩
+['label','period','fee','thr','header'].forEach(k=>{ const el=$(k); el.value=S[k]||''; el.addEventListener('input',()=>{ S[k]=el.value; save(); update(); }); });
+$('rateIn').value=S.rate||''; $('rateIn').addEventListener('input',e=>{ S.rate=e.target.value; save(); update(); });
+$('useEv').checked=!!S.useEv; $('useEv').addEventListener('change',e=>{ S.useEv=e.target.checked; save(); renderRows(); });
+document.querySelectorAll('#modeSeg button').forEach(b=>b.addEventListener('click',()=>{ S.mode=b.dataset.mode; save(); applyMode(); update(); }));
+function applyMode(){ document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===S.mode));
+  $('rateWrap').style.display=S.mode==='rate'?'':'none'; $('feeWrap').querySelector('label').textContent=S.mode==='rate'?'회식비 총액 (원, 선택)':'회식비 총액 (원)'; }
+
+function renderRows(){
+  const ev=S.useEv; $('rhead').className='rhead'+(ev?' ev':''); $('rhead').innerHTML=`<span></span><span>이름</span><span>콜수</span>${ev?'<span>이벤트 원</span>':''}<span></span>`;
+  const box=$('rows'); box.innerHTML='';
+  S.rows.forEach((r,i)=>{ const d=document.createElement('div'); d.className='r'+(ev?' ev':'');
+    d.innerHTML=`<span class="no">${i+1}</span><input class="fld nm" placeholder="이름" value="${(r.name||'').replace(/"/g,'&quot;')}"><input class="fld num cl" inputmode="decimal" placeholder="0" value="${r.calls??''}">${ev?`<input class="fld num evi" inputmode="numeric" placeholder="0" value="${r.event??''}">`:''}<button class="x" title="삭제">×</button><div class="out"></div>`;
+    d.querySelector('.nm').addEventListener('input',e=>{ r.name=e.target.value; save(); update(); });
+    d.querySelector('.cl').addEventListener('input',e=>{ r.calls=e.target.value; save(); update(); });
+    d.querySelector('.cl').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const n=box.querySelectorAll('.cl')[i+1]; if(n){n.focus();n.select();} } });
+    if(ev) d.querySelector('.evi').addEventListener('input',e=>{ r.event=e.target.value; save(); update(); });
+    d.querySelector('.x').addEventListener('click',()=>{ if((r.name||r.calls)&&!confirm(`${r.name||'이 줄'}을(를) 명단에서 지울까요?`))return; S.rows.splice(i,1); if(!S.rows.length)S.rows.push({name:'',calls:'',event:''}); save(); renderRows(); });
+    box.appendChild(d); });
+  update();
+}
+
+function update(){
+  const c=calc(S);
+  // 행별 결과
+  document.querySelectorAll('#rows .r').forEach((d,i)=>{ const r=c.rows[i]; const o=d.querySelector('.out'); if(!r)return;
+    o.innerHTML=r.raw<=0&&!r.event?'':r.under?`${r.calls}콜 · <span class="u">기준 미달 → 운영비</span>`:`${r.calls}콜 → <b>${won(r.final)}원</b>${r.event?` <span class="muted">(이벤트 ${r.event>0?'+':'−'}${won(Math.abs(r.event))})</span>`:''}`; });
+  const named=S.rows.filter(r=>(r.name||'').trim()).length;
+  $('cntLbl').textContent=`${named}명 · 입력 ${c.rows.filter(r=>r.raw>0).length}명`;
+  // 검산
+  const h=num(S.header), ck=$('check');
+  if(!h){ ck.className='check none'; ck.innerHTML=`입력 합계 ${one(c.rawSum)}건<small>스샷 '총 완료'를 1단계에 넣으면 빠진 사람이 없는지 자동으로 맞춰봅니다.</small>`; }
+  else if(Math.abs(c.rawSum-h)<0.05){ ck.className='check ok'; ck.innerHTML=`✅ 검산 일치 — 입력 합계 ${one(c.rawSum)}건 = 총 완료 ${one(h)}건`; }
+  else { const d=h-c.rawSum; ck.className='check bad'; ck.innerHTML=`⚠️ 검산 불일치 — ${d>0?one(d)+'건 부족':one(-d)+'건 초과'}<small>입력 합계 ${one(c.rawSum)}건 · 총 완료 ${one(h)}건. 빠진 사람이나 잘못 친 숫자가 있는지 확인하세요.</small>`; }
+  // 통계
+  $('stats').innerHTML=`
+    <div class="st"><div class="k">전체 콜수</div><div class="v">${won(c.totalCalls)}</div><div class="s">소수점 버림 합계</div></div>
+    <div class="st"><div class="k">콜당 단가</div><div class="v a">${won(c.rate)}원</div><div class="s">${S.mode==='rate'?'직접 입력':`${won(c.fee)} ÷ ${won(c.totalCalls)}`}</div></div>
+    <div class="st"><div class="k">지급 ${c.paid.length}명</div><div class="v g">${won(c.paidSum)}원</div><div class="s">${c.eventSum?`길드비 ${won(c.guildSum)} + 이벤트 ${won(c.eventSum)}`:'100원 미만 버림'}</div></div>
+    <div class="st"><div class="k">운영비 적립</div><div class="v a">${won(c.pool)}원</div><div class="s">미달 ${c.under.length}명${S.mode==='total'?' + 버림 잔돈':''}</div></div>`;
+  // 표
+  const sorted=c.rows.filter(r=>r.filled).sort((a,b)=>b.raw-a.raw);
+  $('tbl').innerHTML=sorted.length?`<thead><tr><th>이름</th><th>합산</th><th>콜수</th><th>지급액</th></tr></thead><tbody>${sorted.map(r=>`<tr class="${r.under?'under':''}"><td>${esc(r.name||'(이름 없음)')}</td><td>${one(r.raw)}</td><td>${r.calls}</td><td class="p">${r.under?'미달':won(r.final)}</td></tr>`).join('')}</tbody><tfoot><tr><td>합계</td><td>${one(c.rawSum)}</td><td>${won(c.totalCalls)}</td><td>${won(c.paidSum)}</td></tr></tfoot>`:'<tbody><tr><td class="muted">콜수를 입력하면 여기에 결과가 나옵니다.</td></tr></tbody>';
+  $('notice').value=buildNotice(c);
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+
+function buildNotice(c){
+  const lb=S.label||'이번 주'; const L=[`📋 길드비 정산 (${lb})`];
+  if(S.period)L.push(`기간 ${S.period}`);
+  L.push(`${S.mode==='total'&&c.fee?`회식비 ${won(c.fee)}원 · `:''}콜당 ${won(c.rate)}원 · 전체 ${won(c.totalCalls)}콜`);
+  if(c.thr)L.push(`지급 기준 ${won(c.thr)}콜 이상`);
+  L.push('━━━━━━━━');
+  c.rows.filter(r=>r.filled).sort((a,b)=>b.raw-a.raw).forEach(r=>{
+    if(r.under){ L.push(`${r.name} ─ ${r.calls}콜 (기준미만·미지급)`); return; }
+    let s=`${r.name} ─ ${r.calls}콜 → ${won(r.pay)}원`; if(r.event) s+=` ${r.event>0?'+이벤트':'−차감'}${won(Math.abs(r.event))}=${won(r.final)}원`; L.push(s); });
+  L.push('━━━━━━━━');
+  if(c.eventSum)L.push(`이벤트 합계 ${won(c.eventSum)}원`);
+  L.push(`운영비 적립 ${won(c.pool)}원`,`총 지급액 ${won(c.paidSum)}원 (${c.paid.length}명)`);
+  return L.join('\n');
+}
+
+// 버튼
+$('addBtn').onclick=()=>{ S.rows.push({name:'',calls:'',event:''}); save(); renderRows(); const n=document.querySelectorAll('#rows .nm'); n[n.length-1].focus(); };
+$('newWeekBtn').onclick=()=>{ if(!confirm('새 주차를 시작할까요?\n이름·기준·회식비는 남기고, 콜수·이벤트·총완료·주차이름을 비웁니다.'))return;
+  S.rows=S.rows.filter(r=>(r.name||'').trim()).map(r=>({name:r.name,calls:'',event:''})); if(!S.rows.length)S.rows=[{name:'',calls:'',event:''}];
+  S.header='';S.label='';S.period=''; ['header','label','period'].forEach(k=>$(k).value=''); save(); renderRows(); $('label').focus(); toast('새 주차 — 콜수를 입력하세요'); };
+$('pasteBtn').onclick=()=>{ $('pasteText').value=''; $('pasteModal').classList.add('open'); $('pasteText').focus(); };
+$('pasteClose').onclick=()=>$('pasteModal').classList.remove('open');
+$('pasteApply').onclick=()=>{ let add=0,upd=0,bad=[];
+  $('pasteText').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const m=/^(.+?)[\s:,\t─-]+([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:건|콜)?$/.exec(l); if(!m){ bad.push(l); return; }
+    const name=m[1].trim(), v=m[2].replace(/,/g,''); const ex=S.rows.find(r=>(r.name||'').trim()===name);
+    if(ex){ ex.calls=v; upd++; } else { const empty=S.rows.find(r=>!(r.name||'').trim()&&!r.calls); if(empty){ empty.name=name; empty.calls=v; } else S.rows.push({name,calls:v,event:''}); add++; } });
+  save(); renderRows(); $('pasteModal').classList.remove('open');
+  toast(`${upd}명 갱신 · ${add}명 추가${bad.length?` · ${bad.length}줄 인식 실패`:''}`); if(bad.length) alert('이 줄은 "이름 숫자" 형식이 아니라 건너뛰었습니다:\n'+bad.join('\n')); };
+$('copyBtn').onclick=()=>{ const t=$('notice').value; (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('공지 복사됨'),()=>{ const ta=$('notice'); ta.removeAttribute('readonly'); ta.select(); document.execCommand('copy'); ta.setAttribute('readonly',''); toast('공지 복사됨'); }); };
+$('csvBtn').onclick=()=>{ const c=calc(S), q=s=>`"${String(s).replace(/"/g,'""')}"`;
+  const rows=[['주차','이름','합산건수','콜수','콜당단가','지급액','이벤트','최종','비고']].concat(c.rows.filter(r=>r.filled).sort((a,b)=>b.raw-a.raw).map(r=>[S.label,r.name,r.raw,r.calls,c.rate,r.under?0:r.pay,r.event,r.final,r.under?'기준미달':'']));
+  rows.push([],['회식비',c.fee],['전체콜수',c.totalCalls],['지급합계',c.paidSum],['운영비',c.pool]);
+  dl(new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),`길드비정산_${(S.label||'주차').replace(/[\/.\s]/g,'')}.csv`); };
+let lastBlob=null;
+$('imgBtn').onclick=()=>{ drawImage(calc(S)).toBlob(b=>{ lastBlob=b; $('imgView').src=URL.createObjectURL(b); $('imgModal').classList.add('open'); },'image/png'); };
+$('imgClose').onclick=()=>$('imgModal').classList.remove('open');
+$('imgSave').onclick=async()=>{ if(!lastBlob)return; const f=new File([lastBlob],`길드비정산_${(S.label||'주차').replace(/[\/.\s]/g,'')}.png`,{type:'image/png'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){ try{ await navigator.share({files:[f],title:'길드비 정산'}); return; }catch(e){} } dl(lastBlob,f.name); };
+function dl(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+function drawImage(c){ const people=c.rows.filter(r=>r.filled).sort((a,b)=>b.raw-a.raw);
+  const DPR=2,W=720,pad=44,rowH=50,head=160,sum=84,th=34,tot=70,foot=44, H=head+sum+th+people.length*rowH+tot+foot;
+  const cv=document.createElement('canvas'); cv.width=W*DPR; cv.height=H*DPR; const x=cv.getContext('2d'); x.scale(DPR,DPR);
+  const F="'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif";
+  x.fillStyle='#f7f5f0'; x.fillRect(0,0,W,H);
+  x.fillStyle='#9c7a57'; x.font=`700 11px ${F}`; x.fillText('A S T R A   G U I L D',pad,50);
+  x.fillStyle='#232019'; x.font=`800 28px ${F}`; x.fillText('길드비 정산 '+(S.label||''),pad,90);
+  x.fillStyle='#948e82'; x.font=`13px ${F}`; x.fillText(`${S.period?S.period+' · ':''}콜당 ${won(c.rate)}원 · 기준 ${won(c.thr)}콜 이상`,pad,118);
+  x.strokeStyle='#232019'; x.lineWidth=1.5; x.beginPath(); x.moveTo(pad,138); x.lineTo(W-pad,138); x.stroke();
+  let y=head; const st=[['전체 콜수',won(c.totalCalls),'#5a7d77'],['지급 인원',c.paid.length+'명','#232019'],['운영비',won(c.pool),'#7f6041'],['총 지급액',won(c.paidSum),'#2f785a']], sw=(W-pad*2)/4;
+  st.forEach((s,i)=>{ const cx=pad+i*sw; if(i){ x.strokeStyle='#e0dacd'; x.beginPath(); x.moveTo(cx,y); x.lineTo(cx,y+54); x.stroke(); }
+    x.textAlign='left'; x.fillStyle='#a39d90'; x.font=`700 11px ${F}`; x.fillText(s[0],cx+12,y+20); x.fillStyle=s[2]; x.font=`800 20px ${F}`; x.fillText(s[1],cx+12,y+48); });
+  y=head+sum; const cN=pad,cC=W-260,cP=W-pad; x.fillStyle='#948e82'; x.font=`700 11px ${F}`;
+  x.textAlign='left'; x.fillText('이름',cN,y+8); x.textAlign='center'; x.fillText('콜수',cC,y+8); x.textAlign='right'; x.fillText('지급액',cP,y+8);
+  x.strokeStyle='#232019'; x.lineWidth=1; x.beginPath(); x.moveTo(pad,y+20); x.lineTo(W-pad,y+20); x.stroke(); let ry=y+20;
+  people.forEach((r,i)=>{ const my=ry+rowH/2; x.textAlign='left'; x.fillStyle=r.under?'#a39d90':'#232019'; x.font=`700 16px ${F}`;
+    let nm=r.name||'-'; if(nm.length>14)nm=nm.slice(0,14)+'…'; x.fillText(`${String(i+1).padStart(2,'0')}  ${nm}`,cN,my+5);
+    x.textAlign='center'; x.fillStyle='#504b42'; x.font=`700 15px ${F}`; x.fillText(String(r.calls),cC,my+5);
+    x.textAlign='right'; if(r.under){ x.fillStyle='#a26a7c'; x.font=`700 14px ${F}`; x.fillText('기준 미달',cP,my+5); }
+    else { x.fillStyle='#2a2620'; x.font=`800 17px ${F}`; x.fillText(won(r.final),cP,my+(r.event?-3:5)); if(r.event){ x.fillStyle=r.event>0?'#a4863f':'#a2554f'; x.font=`11px ${F}`; x.fillText(`${r.event>0?'+이벤트 ':'−차감 '}${won(Math.abs(r.event))}`,cP,my+14); } }
+    x.strokeStyle='#e7e2d6'; x.beginPath(); x.moveTo(pad,ry+rowH); x.lineTo(W-pad,ry+rowH); x.stroke(); ry+=rowH; });
+  ry+=8; x.fillStyle='#232019'; x.fillRect(pad,ry,W-2*pad,50); x.textAlign='left'; x.fillStyle='#fff'; x.font=`700 14px ${F}`; x.fillText('총 지급액',pad+18,ry+30);
+  x.textAlign='right'; x.fillStyle='#e7c79c'; x.font=`800 24px ${F}`; x.fillText(won(c.paidSum)+' 원',W-pad-18,ry+33);
+  x.textAlign='center'; x.fillStyle='#bbb4a6'; x.font=`11px ${F}`; x.fillText('ASTRA · 길드비 정산 계산기',W/2,H-20); return cv; }
+
+applyMode(); renderRows();
+if(S.rows.length<=1&&!S.rows[0].name){ $('help').open=true; }
+</script>
+</body>
+</html>
